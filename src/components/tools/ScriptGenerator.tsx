@@ -216,15 +216,27 @@ const ScriptGenerator = ({
       }
 
       const responseText = await response.text();
+      
+      // Check if response is empty
+      if (!responseText || responseText.trim() === '') {
+        throw new Error('The script generation service returned an empty response. The n8n workflow may need to be configured to return the generated script. Please check the n8n workflow configuration.');
+      }
+      
       let scriptResult: string;
 
       try {
         const jsonData = JSON.parse(responseText);
+        // Handle various response formats from n8n
         scriptResult = typeof jsonData === 'string'
           ? jsonData
-          : (jsonData.merged || jsonData.output || JSON.stringify(jsonData, null, 2));
+          : (jsonData.merged || jsonData.output || jsonData.script || jsonData.text || jsonData.content || jsonData.result || jsonData.response || jsonData.message || (Array.isArray(jsonData) && jsonData[0]?.text) || (Array.isArray(jsonData) && jsonData[0]?.content) || JSON.stringify(jsonData, null, 2));
       } catch {
         scriptResult = responseText;
+      }
+      
+      // Validate the script result is not empty after parsing
+      if (!scriptResult || (typeof scriptResult === 'string' && scriptResult.trim() === '')) {
+        throw new Error('The script generation service returned an empty script. Please try again or contact support.');
       }
 
       const wordCount = countWords(scriptResult);
@@ -263,10 +275,11 @@ const ScriptGenerator = ({
       });
     } catch (err) {
       console.error("Generation error:", err);
-      setError("Something went wrong during script generation. Please try again.");
+      const errorMessage = err instanceof Error ? err.message : "Something went wrong during script generation. Please try again.";
+      setError(errorMessage);
       toast({
-        title: "Error",
-        description: "Failed to generate script.",
+        title: "Script Generation Failed",
+        description: errorMessage.length > 100 ? errorMessage.substring(0, 100) + '...' : errorMessage,
         variant: "destructive",
       });
     } finally {
