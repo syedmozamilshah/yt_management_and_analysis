@@ -160,6 +160,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     setIsAdmin(false);
+    setSession(null);
+    setUser(null);
+    
     try {
       // Prefer local scope; some projects disallow global
       await supabase.auth.signOut({ scope: 'local' });
@@ -167,23 +170,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('signOut(local) failed, applying client-side cleanup:', err);
       // Fallback: clear stored session locally to force logout
       try {
-        const projectRef = new URL(supabase._opts.url).hostname.split('.')[0];
-        const keyPrefix = `sb-${projectRef}-auth-token`;
-        Object.keys(localStorage).forEach((k) => {
-          if (k.startsWith(keyPrefix)) {
-            localStorage.removeItem(k);
+        // Clear all Supabase auth tokens from localStorage
+        const keys = Object.keys(localStorage);
+        keys.forEach((key) => {
+          if (key.startsWith('sb-') && key.includes('-auth-token')) {
+            localStorage.removeItem(key);
           }
         });
-      } catch {}
+      } catch (storageErr) {
+        console.warn('Could not clear localStorage:', storageErr);
+      }
     }
-    // Ensure auth context updates promptly
-    setSession(null);
-    setUser(null);
-    // Redirect to auth and hard refresh to clear any stale state.
-    // Avoid react-router hooks here since AuthProvider wraps BrowserRouter.
-    setTimeout(() => {
-      window.location.assign('/auth');
-    }, 10);
+    
+    // Use window.location.href for navigation to ensure full page reload
+    // This clears all React state and ensures clean auth state
+    window.location.href = '/auth';
   };
 
   const value = {

@@ -2,7 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, TrendingUp, Video, Heart, Wand2, BarChart3, Activity, UserPlus } from 'lucide-react';
+import { Users, TrendingUp, Video, Heart, Wand2, BarChart3, Activity, UserPlus, FileText, Tags } from 'lucide-react';
 
 interface UserStats {
   total_users: number;
@@ -26,6 +26,16 @@ interface VideoStats {
   total_favorites: number;
   total_outliers: number;
   videos_this_week: number;
+}
+
+interface ToolStats {
+  tool_name: string;
+  total_uses: number;
+  uses_today: number;
+  uses_this_week: number;
+  uses_this_month: number;
+  unique_users: number;
+  total_words?: number;
 }
 
 const AdminStatsSection = () => {
@@ -123,7 +133,133 @@ const AdminStatsSection = () => {
     }
   });
 
-  const isLoading = userStatsLoading || aiStatsLoading || videoStatsLoading;
+  // Fetch Script Generator usage statistics
+  const { data: scriptStats, isLoading: scriptStatsLoading } = useQuery({
+    queryKey: ['admin-script-stats'],
+    queryFn: async () => {
+      try {
+        const { data: allScripts, error } = await (supabase as any)
+          .from('user_scripts')
+          .select('id, user_id, word_count, created_at');
+        
+        if (error) throw error;
+
+        const now = new Date();
+        const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        const totalUses = allScripts?.length || 0;
+        const usesToday = allScripts?.filter((s: any) => new Date(s.created_at) > dayAgo).length || 0;
+        const usesThisWeek = allScripts?.filter((s: any) => new Date(s.created_at) > weekAgo).length || 0;
+        const usesThisMonth = allScripts?.filter((s: any) => new Date(s.created_at) > monthAgo).length || 0;
+        const uniqueUsers = new Set(allScripts?.map((s: any) => s.user_id) || []).size;
+        const totalWords = allScripts?.reduce((sum: number, s: any) => sum + (s.word_count || 0), 0) || 0;
+
+        return {
+          tool_name: 'Script Generator',
+          total_uses: totalUses,
+          uses_today: usesToday,
+          uses_this_week: usesThisWeek,
+          uses_this_month: usesThisMonth,
+          unique_users: uniqueUsers,
+          total_words: totalWords
+        } as ToolStats;
+      } catch {
+        return {
+          tool_name: 'Script Generator',
+          total_uses: 0,
+          uses_today: 0,
+          uses_this_week: 0,
+          uses_this_month: 0,
+          unique_users: 0,
+          total_words: 0
+        } as ToolStats;
+      }
+    }
+  });
+
+  // Fetch SEO Generator usage statistics
+  const { data: seoStats, isLoading: seoStatsLoading } = useQuery({
+    queryKey: ['admin-seo-stats'],
+    queryFn: async () => {
+      try {
+        const { data: allSeo, error } = await (supabase as any)
+          .from('user_seo_descriptions')
+          .select('id, user_id, created_at');
+        
+        if (error) throw error;
+
+        const now = new Date();
+        const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        const totalUses = allSeo?.length || 0;
+        const usesToday = allSeo?.filter((s: any) => new Date(s.created_at) > dayAgo).length || 0;
+        const usesThisWeek = allSeo?.filter((s: any) => new Date(s.created_at) > weekAgo).length || 0;
+        const usesThisMonth = allSeo?.filter((s: any) => new Date(s.created_at) > monthAgo).length || 0;
+        const uniqueUsers = new Set(allSeo?.map((s: any) => s.user_id) || []).size;
+
+        return {
+          tool_name: 'SEO Generator',
+          total_uses: totalUses,
+          uses_today: usesToday,
+          uses_this_week: usesThisWeek,
+          uses_this_month: usesThisMonth,
+          unique_users: uniqueUsers
+        } as ToolStats;
+      } catch {
+        return {
+          tool_name: 'SEO Generator',
+          total_uses: 0,
+          uses_today: 0,
+          uses_this_week: 0,
+          uses_this_month: 0,
+          unique_users: 0
+        } as ToolStats;
+      }
+    }
+  });
+
+  // Fetch Word Usage statistics across all users
+  const { data: wordUsageStats, isLoading: wordUsageLoading } = useQuery({
+    queryKey: ['admin-word-usage-stats'],
+    queryFn: async () => {
+      try {
+        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+        const { data: usageData, error } = await (supabase as any)
+          .from('user_tool_usage')
+          .select('user_id, word_usage, max_words, month')
+          .eq('month', currentMonth);
+        
+        if (error) throw error;
+
+        const totalWordsUsed = usageData?.reduce((sum: number, u: any) => sum + (u.word_usage || 0), 0) || 0;
+        const totalWordsAllowed = usageData?.reduce((sum: number, u: any) => sum + (u.max_words || 40000), 0) || 0;
+        const usersWithUsage = usageData?.length || 0;
+        const avgUsagePerUser = usersWithUsage > 0 ? Math.round(totalWordsUsed / usersWithUsage) : 0;
+
+        return {
+          total_words_used: totalWordsUsed,
+          total_words_allowed: totalWordsAllowed,
+          users_with_usage: usersWithUsage,
+          avg_usage_per_user: avgUsagePerUser,
+          current_month: currentMonth
+        };
+      } catch {
+        return {
+          total_words_used: 0,
+          total_words_allowed: 0,
+          users_with_usage: 0,
+          avg_usage_per_user: 0,
+          current_month: new Date().toISOString().slice(0, 7)
+        };
+      }
+    }
+  });
+
+  const isLoading = userStatsLoading || aiStatsLoading || videoStatsLoading || scriptStatsLoading || seoStatsLoading || wordUsageLoading;
 
   const getToolDisplayName = (toolType: string) => {
     switch (toolType) {
@@ -336,6 +472,121 @@ const AdminStatsSection = () => {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Script Generator & SEO Generator Usage */}
+      <div>
+        <h3 className="text-lg font-semibold text-[#f1f1f1] mb-4 flex items-center gap-2">
+          <FileText className="w-5 h-5 text-[#cc0000]" />
+          Content Generation Tools
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Script Generator Stats */}
+          <Card className="bg-[#181818] border-[#272727]">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileText className="w-5 h-5 text-orange-400" />
+                <span className="text-[#f1f1f1]">Script Generator</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-[#aaaaaa] text-sm">Total Scripts</span>
+                  <span className="text-[#f1f1f1] font-bold">{scriptStats?.total_uses || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[#aaaaaa] text-sm">Today</span>
+                  <span className="text-green-400 font-medium">{scriptStats?.uses_today || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[#aaaaaa] text-sm">This Week</span>
+                  <span className="text-blue-400 font-medium">{scriptStats?.uses_this_week || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[#aaaaaa] text-sm">This Month</span>
+                  <span className="text-purple-400 font-medium">{scriptStats?.uses_this_month || 0}</span>
+                </div>
+                <div className="flex justify-between items-center border-t border-[#272727] pt-2 mt-2">
+                  <span className="text-[#aaaaaa] text-sm">Unique Users</span>
+                  <span className="text-[#cc0000] font-medium">{scriptStats?.unique_users || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[#aaaaaa] text-sm">Total Words Generated</span>
+                  <span className="text-yellow-400 font-medium">{(scriptStats?.total_words || 0).toLocaleString()}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* SEO Generator Stats */}
+          <Card className="bg-[#181818] border-[#272727]">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Tags className="w-5 h-5 text-cyan-400" />
+                <span className="text-[#f1f1f1]">SEO Generator</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-[#aaaaaa] text-sm">Total SEO Generated</span>
+                  <span className="text-[#f1f1f1] font-bold">{seoStats?.total_uses || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[#aaaaaa] text-sm">Today</span>
+                  <span className="text-green-400 font-medium">{seoStats?.uses_today || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[#aaaaaa] text-sm">This Week</span>
+                  <span className="text-blue-400 font-medium">{seoStats?.uses_this_week || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[#aaaaaa] text-sm">This Month</span>
+                  <span className="text-purple-400 font-medium">{seoStats?.uses_this_month || 0}</span>
+                </div>
+                <div className="flex justify-between items-center border-t border-[#272727] pt-2 mt-2">
+                  <span className="text-[#aaaaaa] text-sm">Unique Users</span>
+                  <span className="text-[#cc0000] font-medium">{seoStats?.unique_users || 0}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Monthly Word Usage Stats */}
+          <Card className="bg-[#181818] border-[#272727]">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-pink-400" />
+                <span className="text-[#f1f1f1]">Monthly Word Usage</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-[#aaaaaa] text-sm">Current Month</span>
+                  <span className="text-[#f1f1f1] font-medium">{wordUsageStats?.current_month || '-'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[#aaaaaa] text-sm">Total Words Used</span>
+                  <span className="text-[#f1f1f1] font-bold">{(wordUsageStats?.total_words_used || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[#aaaaaa] text-sm">Users with Usage</span>
+                  <span className="text-blue-400 font-medium">{wordUsageStats?.users_with_usage || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[#aaaaaa] text-sm">Avg per User</span>
+                  <span className="text-purple-400 font-medium">{(wordUsageStats?.avg_usage_per_user || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center border-t border-[#272727] pt-2 mt-2">
+                  <span className="text-[#aaaaaa] text-sm">Total Limit Across Users</span>
+                  <span className="text-green-400 font-medium">{(wordUsageStats?.total_words_allowed || 0).toLocaleString()}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
