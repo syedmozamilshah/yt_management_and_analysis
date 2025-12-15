@@ -22,6 +22,15 @@ const SeoGenerator = ({ onSeoGenerated, currentSeo }: SeoGeneratorProps) => {
   );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+  // Simulate initial loading for visual consistency
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialLoading(false);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Update state when currentSeo changes
   useEffect(() => {
@@ -174,6 +183,57 @@ const SeoGenerator = ({ onSeoGenerated, currentSeo }: SeoGeneratorProps) => {
   const tagsList = seoResult?.tags
     ? seoResult.tags.split(",").map((tag) => tag.trim()).filter(Boolean)
     : [];
+
+  // Loading skeleton
+  if (isInitialLoading) {
+    return (
+      <div className="w-full max-w-5xl mx-auto">
+        {/* Header skeleton */}
+        <header className="mb-6 sm:mb-8">
+          <div className="w-56 h-8 bg-[#272727] rounded animate-pulse mb-2" />
+          <div className="w-96 h-4 bg-[#272727] rounded animate-pulse" />
+        </header>
+
+        {/* Input Card skeleton */}
+        <div className="bg-[#0f0f0f] border border-[#272727] rounded-xl p-6 mb-6 animate-pulse">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-5 h-5 bg-[#272727] rounded" />
+            <div className="w-36 h-6 bg-[#272727] rounded" />
+          </div>
+          <div className="w-72 h-4 bg-[#272727] rounded mb-4" />
+          <div className="h-32 bg-[#272727] rounded-lg mb-4" />
+          <div className="w-32 h-10 bg-[#272727] rounded-lg" />
+        </div>
+
+        {/* Results skeleton */}
+        <div className="space-y-4">
+          <div className="bg-[#0f0f0f] border border-[#272727] rounded-xl p-6 animate-pulse">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-5 h-5 bg-[#272727] rounded" />
+              <div className="w-40 h-6 bg-[#272727] rounded" />
+            </div>
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="h-12 bg-[#272727] rounded-lg" />
+              ))}
+            </div>
+          </div>
+          <div className="bg-[#0f0f0f] border border-[#272727] rounded-xl p-6 animate-pulse">
+            <div className="w-32 h-6 bg-[#272727] rounded mb-4" />
+            <div className="h-24 bg-[#272727] rounded-lg" />
+          </div>
+          <div className="bg-[#0f0f0f] border border-[#272727] rounded-xl p-6 animate-pulse">
+            <div className="w-20 h-6 bg-[#272727] rounded mb-4" />
+            <div className="flex flex-wrap gap-2">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="w-20 h-6 bg-[#272727] rounded-full" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-5xl mx-auto">

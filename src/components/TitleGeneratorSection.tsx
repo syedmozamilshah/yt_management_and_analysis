@@ -43,9 +43,18 @@ export const TitleGeneratorSection = () => {
   const [generatedTitles, setGeneratedTitles] = useState<GeneratedTitleWithAnalysis[]>([]);
   const [referenceVideos, setReferenceVideos] = useState<Video[]>([]);
   const [totalAnalyzed, setTotalAnalyzed] = useState<number>(0);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const { toast } = useToast();
 
   const steps = ['Choose Data Source', 'Paste Your Script', 'Review & Edit', 'Get Your Titles'];
+
+  // Simulate initial loading for visual consistency
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialLoading(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleDataSourceSelect = (source: 'outliers' | 'favorites') => {
     setDataSource(source);
@@ -158,6 +167,58 @@ export const TitleGeneratorSection = () => {
     setGeneratedTitles([]);
     setReferenceVideos([]);
   };
+
+  // Loading skeleton
+  if (isInitialLoading) {
+    return (
+      <div className="space-y-8">
+        {/* Header skeleton */}
+        <div className="bg-[#181818] border border-[#272727] rounded-2xl p-8">
+          <div className="text-center space-y-4">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-[#272727] rounded-xl animate-pulse" />
+            </div>
+            <div className="w-48 h-10 bg-[#272727] rounded mx-auto animate-pulse" />
+            <div className="w-96 h-5 bg-[#272727] rounded mx-auto animate-pulse" />
+          </div>
+        </div>
+
+        {/* Steps skeleton */}
+        <div className="flex justify-center gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-[#272727] rounded-full animate-pulse" />
+              <div className="w-24 h-4 bg-[#272727] rounded animate-pulse hidden sm:block" />
+            </div>
+          ))}
+        </div>
+
+        {/* Content skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-[#181818] border border-[#272727] rounded-xl p-6 animate-pulse">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 bg-[#272727] rounded-lg" />
+              <div className="flex-1">
+                <div className="w-32 h-5 bg-[#272727] rounded mb-2" />
+                <div className="w-48 h-4 bg-[#272727] rounded" />
+              </div>
+            </div>
+            <div className="h-20 bg-[#272727] rounded-lg" />
+          </div>
+          <div className="bg-[#181818] border border-[#272727] rounded-xl p-6 animate-pulse">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 bg-[#272727] rounded-lg" />
+              <div className="flex-1">
+                <div className="w-32 h-5 bg-[#272727] rounded mb-2" />
+                <div className="w-48 h-4 bg-[#272727] rounded" />
+              </div>
+            </div>
+            <div className="h-20 bg-[#272727] rounded-lg" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

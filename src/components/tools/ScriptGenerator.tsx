@@ -58,6 +58,15 @@ const ScriptGenerator = ({
   const [originalArticle, setOriginalArticle] = useState(currentScript?.originalArticle || "");
   const [outline, setOutline] = useState(currentScript?.outline || "");
   const [result, setResult] = useState(currentScript?.result || "");
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+  // Simulate initial loading for visual consistency
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialLoading(false);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, []);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStage, setLoadingStage] = useState(0);
   const [currentLoadingStages, setCurrentLoadingStages] = useState<string[]>(analyzeLoadingStages);
@@ -323,6 +332,39 @@ const ScriptGenerator = ({
       description: "Content copied to clipboard.",
     });
   };
+
+  // Loading skeleton
+  if (isInitialLoading) {
+    return (
+      <div className="w-full max-w-5xl mx-auto">
+        {/* Header skeleton */}
+        <header className="mb-6 sm:mb-8">
+          <div className="w-48 h-8 bg-[#272727] rounded animate-pulse mb-2" />
+          <div className="w-72 h-4 bg-[#272727] rounded animate-pulse" />
+          
+          {/* Progress Steps skeleton */}
+          <div className="flex items-center gap-2 mt-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-2">
+                <div className="w-20 h-8 bg-[#272727] rounded-full animate-pulse" />
+                {i < 3 && <div className="h-px w-8 bg-[#272727]" />}
+              </div>
+            ))}
+          </div>
+        </header>
+
+        {/* Card skeleton */}
+        <div className="bg-[#181818] border border-[#272727] rounded-xl p-6 animate-pulse">
+          <div className="w-40 h-6 bg-[#272727] rounded mb-4" />
+          <div className="h-48 bg-[#272727] rounded-lg mb-4" />
+          <div className="flex gap-4">
+            <div className="w-32 h-10 bg-[#272727] rounded-lg" />
+            <div className="w-24 h-10 bg-[#272727] rounded-lg" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-5xl mx-auto">

@@ -6,8 +6,7 @@ import { AllUsersVideoGrid } from '@/components/AllUsersVideoGrid';
 import { TitleGeneratorSection } from '@/components/TitleGeneratorSection';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
-import { Button } from '@/components/ui/button';
-import { FileText, Globe, User } from 'lucide-react';
+import { Globe, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -24,8 +23,11 @@ const Index = () => {
     const tab = params.get('tab');
     if (tab === 'title-generator') {
       setActiveTab('title-generator');
+    } else {
+      // Reset to videos if no tab param or different tab
+      setActiveTab('videos');
     }
-  }, [location]);
+  }, [location.search]);
 
   const handleVideoAdded = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -44,13 +46,7 @@ const Index = () => {
                 <div className="px-4 sm:px-8 py-6">
                   <div className="flex items-center gap-4">
                     <SidebarTrigger className="text-[#f1f1f1] hover:bg-[#272727] rounded-xl p-2 transition-all duration-300" />
-                    <Button 
-                      onClick={() => setActiveTab('videos')}
-                      className="bg-[#cc0000] hover:bg-[#aa0000] text-white"
-                      size="default"
-                    >
-                      Back to Videos
-                    </Button>
+                    <h1 className="text-xl sm:text-2xl font-semibold text-white">Title Generator</h1>
                   </div>
                 </div>
               </div>
@@ -60,33 +56,23 @@ const Index = () => {
             {activeTab === 'videos' && (
               <div className="sticky top-0 z-10 backdrop-blur-xl bg-[#181818] border-b border-[#272727]">
                 <div className="px-4 sm:px-8 py-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <SidebarTrigger className="text-[#f1f1f1] hover:bg-[#272727] rounded-xl p-2 transition-all duration-300" />
-                      {isAdmin && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#212121] border border-[#272727]">
-                          {shouldQueryAllData() ? (
-                            <>
-                              <Globe className="w-4 h-4 text-[#cc0000]" />
-                              <span className="text-sm text-[#cc0000] font-medium">Viewing All Users Data</span>
-                            </>
-                          ) : (
-                            <>
-                              <User className="w-4 h-4 text-[#aaaaaa]" />
-                              <span className="text-sm text-[#aaaaaa] font-medium">Viewing My Data</span>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <Button 
-                      onClick={() => setActiveTab('title-generator')}
-                      className="bg-[#cc0000] hover:bg-[#aa0000] text-white"
-                      size="default"
-                    >
-                      <FileText className="w-4 h-4 mr-2" />
-                      Generate Title
-                    </Button>
+                  <div className="flex items-center gap-4">
+                    <SidebarTrigger className="text-[#f1f1f1] hover:bg-[#272727] rounded-xl p-2 transition-all duration-300" />
+                    {isAdmin && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#212121] border border-[#272727]">
+                        {shouldQueryAllData() ? (
+                          <>
+                            <Globe className="w-4 h-4 text-[#cc0000]" />
+                            <span className="text-sm text-[#cc0000] font-medium">Viewing All Users Data</span>
+                          </>
+                        ) : (
+                          <>
+                            <User className="w-4 h-4 text-[#aaaaaa]" />
+                            <span className="text-sm text-[#aaaaaa] font-medium">Viewing My Data</span>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

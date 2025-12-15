@@ -95,40 +95,10 @@ const ToolsHistorySidebar = ({
     <>
       {/* Sidebar */}
       <aside className="h-full w-full bg-[#0f0f0f] border-r border-[#272727] flex flex-col overflow-hidden">
-        {/* Header with Tool Selection */}
+        {/* Header with New Button */}
         <div className="p-4 border-b border-[#272727]">
-          <div className="flex gap-2">
-            <Button
-              variant={activeTab === "script" ? "default" : "outline"}
-              size="sm"
-              className={cn(
-                "flex-1 gap-2",
-                activeTab === "script" 
-                  ? "bg-[#cc0000] hover:bg-[#cc0000]/90 text-white" 
-                  : "border-[#272727] text-[#aaaaaa] hover:text-white hover:bg-[#272727]"
-              )}
-              onClick={() => setActiveTab("script")}
-            >
-              <FileText className="h-4 w-4" />
-              Script
-            </Button>
-            <Button
-              variant={activeTab === "seo" ? "default" : "outline"}
-              size="sm"
-              className={cn(
-                "flex-1 gap-2",
-                activeTab === "seo" 
-                  ? "bg-[#cc0000] hover:bg-[#cc0000]/90 text-white" 
-                  : "border-[#272727] text-[#aaaaaa] hover:text-white hover:bg-[#272727]"
-              )}
-              onClick={() => setActiveTab("seo")}
-            >
-              <Sparkles className="h-4 w-4" />
-              SEO
-            </Button>
-          </div>
           <Button
-            className="w-full mt-3 bg-[#cc0000] hover:bg-[#cc0000]/90 text-white"
+            className="w-full bg-[#cc0000] hover:bg-[#cc0000]/90 text-white"
             onClick={activeTab === "script" ? handleNewScriptClick : onNewSeo}
             disabled={activeTab === "script" && isLimitReached}
           >
@@ -136,36 +106,38 @@ const ToolsHistorySidebar = ({
           </Button>
         </div>
 
-        {/* Word Limit Indicator */}
-        <div className="p-4 border-b border-[#272727]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-[#aaaaaa]">Monthly Limit</span>
-            <span className="text-xs text-[#666666]">
-              {wordUsage.toLocaleString()} / {maxWords.toLocaleString()}
-            </span>
-          </div>
-          <div className="w-full bg-[#272727] rounded-full h-2 overflow-hidden">
-            <div
-              className={cn(
-                "h-full transition-all duration-300",
-                (wordUsage / maxWords) < 0.7
-                  ? "bg-[#cc0000]"
-                  : (wordUsage / maxWords) < 0.9
-                  ? "bg-yellow-500"
-                  : "bg-red-600"
-              )}
-              style={{ width: `${Math.min((wordUsage / maxWords) * 100, 100)}%` }}
-            />
-          </div>
-          <p className="text-xs text-[#666666] mt-2">
-            {Math.round((wordUsage / maxWords) * 100)}% used
-            {isLimitReached && (
-              <span className="block text-red-500 font-medium mt-1">
-                Limit reached • Resets {getNextResetDate()}
+        {/* Word Limit Indicator - Only show for Script tab */}
+        {activeTab === "script" && (
+          <div className="p-4 border-b border-[#272727]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-[#aaaaaa]">Monthly Limit</span>
+              <span className="text-xs text-[#666666]">
+                {wordUsage.toLocaleString()} / {maxWords.toLocaleString()}
               </span>
-            )}
-          </p>
-        </div>
+            </div>
+            <div className="w-full bg-[#272727] rounded-full h-2 overflow-hidden">
+              <div
+                className={cn(
+                  "h-full transition-all duration-300",
+                  (wordUsage / maxWords) < 0.7
+                    ? "bg-[#cc0000]"
+                    : (wordUsage / maxWords) < 0.9
+                    ? "bg-yellow-500"
+                    : "bg-red-600"
+                )}
+                style={{ width: `${Math.min((wordUsage / maxWords) * 100, 100)}%` }}
+              />
+            </div>
+            <p className="text-xs text-[#666666] mt-2">
+              {Math.round((wordUsage / maxWords) * 100)}% used
+              {isLimitReached && (
+                <span className="block text-red-500 font-medium mt-1">
+                  Limit reached • Resets {getNextResetDate()}
+                </span>
+              )}
+            </p>
+          </div>
+        )}
 
         {/* History List */}
         <div className="flex-1 overflow-y-auto">

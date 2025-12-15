@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,16 +8,52 @@ import ToolsHistorySidebar, { SavedScript, SavedSeoDescription } from '@/compone
 import ScriptGenerator from '@/components/tools/ScriptGenerator';
 import SeoGenerator from '@/components/tools/SeoGenerator';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 
 const MAX_WORDS = 40000;
 
+const CACHE_KEY = 'tools_data_cache';
+const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
+
+interface CachedData {
+  scripts: SavedScript[];
+  seoDescriptions: SavedSeoDescription[];
+  wordUsage: number;
+  timestamp: number;
+  userId: string;
+}
+
+const getCache = (userId: string): CachedData | null => {
+  try {
+    const cached = sessionStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const data = JSON.parse(cached) as CachedData;
+      // Check if cache is valid (same user and not expired)
+      if (data.userId === userId && Date.now() - data.timestamp < CACHE_EXPIRY) {
+        return data;
+      }
+    }
+  } catch (e) {
+    console.error('Error reading cache:', e);
+  }
+  return null;
+};
+
+const setCache = (data: Omit<CachedData, 'timestamp'>) => {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ...data, timestamp: Date.now() }));
+  } catch (e) {
+    console.error('Error setting cache:', e);
+  }
+};
+
 const Tools = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<"script" | "seo">("script");
   const [scripts, setScripts] = useState<SavedScript[]>([]);
   const [seoDescriptions, setSeoDescriptions] = useState<SavedSeoDescription[]>([]);
@@ -27,20 +63,55 @@ const Tools = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
+  // Handle URL tab parameter
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    if (tab === 'script' || tab === 'seo') {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
+
   useEffect(() => {
     if (user) {
-      loadData();
+      // Check for cached data first
+      const cached = getCache(user.id);
+      if (cached) {
+        setScripts(cached.scripts);
+        setSeoDescriptions(cached.seoDescriptions);
+        setWordUsage(cached.wordUsage);
+        setIsLoading(false);
+      } else {
+        loadData();
+      }
     }
   }, [user]);
+
+  // Update cache when data changes
+  useEffect(() => {
+    if (user && !isLoading && (scripts.length > 0 || seoDescriptions.length > 0 || wordUsage > 0)) {
+      setCache({
+        scripts,
+        seoDescriptions,
+        wordUsage,
+        userId: user.id,
+      });
+    }
+  }, [scripts, seoDescriptions, wordUsage, user, isLoading]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
       // Load word usage
+      let loadedWordUsage = 0;
       const usageData = await getWordUsage();
       if (usageData) {
-        setWordUsage(usageData.wordUsage);
+        loadedWordUsage = usageData.wordUsage;
+        setWordUsage(loadedWordUsage);
       }
+
+      let loadedScripts: SavedScript[] = [];
+      let loadedSeoDescriptions: SavedSeoDescription[] = [];
 
       // Load scripts from Supabase
       const { data: scriptsData, error: scriptsError } = await (supabase as any)
@@ -52,14 +123,15 @@ const Tools = () => {
       if (scriptsError) {
         console.error('Error loading scripts:', scriptsError);
       } else if (scriptsData) {
-        setScripts(scriptsData.map((s: any) => ({
+        loadedScripts = scriptsData.map((s: any) => ({
           id: s.id,
           originalArticle: s.original_article || '',
           outline: s.outline || '',
           result: s.result,
           timestamp: new Date(s.created_at).getTime(),
           wordCount: s.word_count || 0,
-        })));
+        }));
+        setScripts(loadedScripts);
       }
 
       // Load SEO descriptions from Supabase
@@ -72,14 +144,25 @@ const Tools = () => {
       if (seoError) {
         console.error('Error loading SEO descriptions:', seoError);
       } else if (seoData) {
-        setSeoDescriptions(seoData.map((s: any) => ({
+        loadedSeoDescriptions = seoData.map((s: any) => ({
           id: s.id,
           script: s.script,
           titles: s.titles || [],
           description: s.description,
           tags: s.tags,
           timestamp: new Date(s.created_at).getTime(),
-        })));
+        }));
+        setSeoDescriptions(loadedSeoDescriptions);
+      }
+
+      // Cache the loaded data
+      if (user) {
+        setCache({
+          scripts: loadedScripts,
+          seoDescriptions: loadedSeoDescriptions,
+          wordUsage: loadedWordUsage,
+          userId: user.id,
+        });
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -272,9 +355,60 @@ const Tools = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <div className="text-[#aaaaaa]">Loading...</div>
-      </div>
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full bg-[#0f0f0f]">
+          <AppSidebar />
+          <SidebarInset className="flex-1">
+            <div className="min-h-screen bg-[#0a0a0a] flex flex-col">
+              {/* Header skeleton */}
+              <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#181818]/95 border-b border-[#272727]">
+                <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
+                  <div className="flex items-center gap-2 sm:gap-4">
+                    <div className="w-10 h-10 bg-[#272727] rounded-lg animate-pulse" />
+                    <div className="w-20 h-8 bg-[#272727] rounded-lg animate-pulse" />
+                    <div className="h-6 w-px bg-[#272727] hidden sm:block" />
+                    <div className="w-24 h-6 bg-[#272727] rounded animate-pulse" />
+                  </div>
+                  <div className="w-10 h-10 bg-[#272727] rounded-lg animate-pulse" />
+                </div>
+              </header>
+
+              {/* Content skeleton */}
+              <div className="flex-1 p-4 sm:p-6 lg:p-8">
+                <div className="max-w-4xl mx-auto space-y-6">
+                  {/* Title skeleton */}
+                  <div className="text-center space-y-4">
+                    <div className="w-16 h-16 bg-[#272727] rounded-full mx-auto animate-pulse" />
+                    <div className="w-64 h-8 bg-[#272727] rounded mx-auto animate-pulse" />
+                    <div className="w-96 h-4 bg-[#272727] rounded mx-auto animate-pulse" />
+                  </div>
+
+                  {/* Card skeletons */}
+                  <div className="space-y-4 mt-8">
+                    <div className="bg-[#181818] border border-[#272727] rounded-xl p-6 animate-pulse">
+                      <div className="w-32 h-5 bg-[#272727] rounded mb-4" />
+                      <div className="h-32 bg-[#272727] rounded-lg" />
+                    </div>
+                    <div className="bg-[#181818] border border-[#272727] rounded-xl p-6 animate-pulse">
+                      <div className="w-40 h-5 bg-[#272727] rounded mb-4" />
+                      <div className="h-24 bg-[#272727] rounded-lg" />
+                    </div>
+                    <div className="bg-[#181818] border border-[#272727] rounded-xl p-6 animate-pulse">
+                      <div className="w-28 h-5 bg-[#272727] rounded mb-4" />
+                      <div className="h-20 bg-[#272727] rounded-lg" />
+                    </div>
+                  </div>
+
+                  {/* Button skeleton */}
+                  <div className="flex justify-center mt-6">
+                    <div className="w-40 h-12 bg-[#272727] rounded-lg animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
     );
   }
 
@@ -289,16 +423,6 @@ const Tools = () => {
               <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <SidebarTrigger className="text-[#f1f1f1] hover:bg-[#272727] rounded-lg p-2 transition-all" />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate(-1)}
-                    className="text-[#aaaaaa] hover:text-white hover:bg-[#272727] gap-1 sm:gap-2 px-2 sm:px-3"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    <span className="hidden sm:inline">Back</span>
-                  </Button>
-                  <div className="h-6 w-px bg-[#272727] hidden sm:block" />
                   <h1 className="text-lg sm:text-xl font-semibold text-white">
                     AI Tools
                   </h1>

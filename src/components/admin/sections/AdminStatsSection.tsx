@@ -2,7 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, TrendingUp, Video, Heart, Wand2, BarChart3, Activity, UserPlus, FileText, Tags } from 'lucide-react';
+import { Users, TrendingUp, Video, Heart, Wand2, BarChart3, Activity, UserPlus, FileText, Tags, Type } from 'lucide-react';
 
 interface UserStats {
   total_users: number;
@@ -222,6 +222,49 @@ const AdminStatsSection = () => {
     }
   });
 
+  // Fetch Title Generator usage statistics
+  const { data: titleStats, isLoading: titleStatsLoading } = useQuery({
+    queryKey: ['admin-title-stats'],
+    queryFn: async () => {
+      try {
+        const { data: allTitles, error } = await (supabase as any)
+          .from('title_generations')
+          .select('id, user_id, created_at');
+        
+        if (error) throw error;
+
+        const now = new Date();
+        const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        const totalUses = allTitles?.length || 0;
+        const usesToday = allTitles?.filter((s: any) => new Date(s.created_at) > dayAgo).length || 0;
+        const usesThisWeek = allTitles?.filter((s: any) => new Date(s.created_at) > weekAgo).length || 0;
+        const usesThisMonth = allTitles?.filter((s: any) => new Date(s.created_at) > monthAgo).length || 0;
+        const uniqueUsers = new Set(allTitles?.map((s: any) => s.user_id) || []).size;
+
+        return {
+          tool_name: 'Title Generator',
+          total_uses: totalUses,
+          uses_today: usesToday,
+          uses_this_week: usesThisWeek,
+          uses_this_month: usesThisMonth,
+          unique_users: uniqueUsers
+        } as ToolStats;
+      } catch {
+        return {
+          tool_name: 'Title Generator',
+          total_uses: 0,
+          uses_today: 0,
+          uses_this_week: 0,
+          uses_this_month: 0,
+          unique_users: 0
+        } as ToolStats;
+      }
+    }
+  });
+
   // Fetch Word Usage statistics across all users
   const { data: wordUsageStats, isLoading: wordUsageLoading } = useQuery({
     queryKey: ['admin-word-usage-stats'],
@@ -259,7 +302,7 @@ const AdminStatsSection = () => {
     }
   });
 
-  const isLoading = userStatsLoading || aiStatsLoading || videoStatsLoading || scriptStatsLoading || seoStatsLoading || wordUsageLoading;
+  const isLoading = userStatsLoading || aiStatsLoading || videoStatsLoading || scriptStatsLoading || seoStatsLoading || titleStatsLoading || wordUsageLoading;
 
   const getToolDisplayName = (toolType: string) => {
     switch (toolType) {
@@ -480,7 +523,7 @@ const AdminStatsSection = () => {
           <FileText className="w-5 h-5 text-[#cc0000]" />
           Content Generation Tools
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Script Generator Stats */}
           <Card className="bg-[#181818] border-[#272727]">
             <CardHeader className="pb-2">
@@ -548,6 +591,40 @@ const AdminStatsSection = () => {
                 <div className="flex justify-between items-center border-t border-[#272727] pt-2 mt-2">
                   <span className="text-[#aaaaaa] text-sm">Unique Users</span>
                   <span className="text-[#cc0000] font-medium">{seoStats?.unique_users || 0}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Title Generator Stats */}
+          <Card className="bg-[#181818] border-[#272727]">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Type className="w-5 h-5 text-purple-400" />
+                <span className="text-[#f1f1f1]">Title Generator</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-[#aaaaaa] text-sm">Total Titles Generated</span>
+                  <span className="text-[#f1f1f1] font-bold">{titleStats?.total_uses || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[#aaaaaa] text-sm">Today</span>
+                  <span className="text-green-400 font-medium">{titleStats?.uses_today || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[#aaaaaa] text-sm">This Week</span>
+                  <span className="text-blue-400 font-medium">{titleStats?.uses_this_week || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[#aaaaaa] text-sm">This Month</span>
+                  <span className="text-purple-400 font-medium">{titleStats?.uses_this_month || 0}</span>
+                </div>
+                <div className="flex justify-between items-center border-t border-[#272727] pt-2 mt-2">
+                  <span className="text-[#aaaaaa] text-sm">Unique Users</span>
+                  <span className="text-[#cc0000] font-medium">{titleStats?.unique_users || 0}</span>
                 </div>
               </div>
             </CardContent>

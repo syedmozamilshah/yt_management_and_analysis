@@ -13,17 +13,18 @@ import {
 import { useLocation, useNavigate } from "react-router-dom"
 import { 
   Home, 
-  Database, 
+  Lightbulb, 
   BarChart3, 
   Heart,
-  Users,
   Settings,
   LogOut,
   TrendingUp,
   Globe,
   User,
   PieChart,
-  Wrench
+  FileText,
+  Type,
+  Tags
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { Button } from "@/components/ui/button"
@@ -35,18 +36,23 @@ export function AppSidebar() {
   const navigate = useNavigate()
   const { user, isAdmin, signOut, adminDataMode, setAdminDataMode } = useAuth()
 
-  // Menu items - Home is only shown for non-admin users
+  // Menu items - Reorganized sidebar
   const items = [
-    // Only show Home for non-admin users
+    {
+      title: "Ideation",
+      url: "/",
+      icon: Lightbulb,
+    },
+    // Only show Content for non-admin users
     ...(!isAdmin ? [{
-      title: "Home",
+      title: "Content",
       url: "/home",
       icon: Home,
     }] : []),
     {
-      title: "Database",
-      url: "/",
-      icon: Database,
+      title: "Favorites",
+      url: "/favorites",
+      icon: Heart,
     },
     {
       title: "Viewboard",
@@ -54,19 +60,19 @@ export function AppSidebar() {
       icon: BarChart3,
     },
     {
-      title: "Favorites",
-      url: "/favorites",
-      icon: Heart,
+      title: "Script",
+      url: "/tools?tab=script",
+      icon: FileText,
     },
     {
-      title: "Competitors",
-      url: "/competitors",
-      icon: Users,
+      title: "Title",
+      url: "/?tab=title-generator",
+      icon: Type,
     },
     {
-      title: "Tools",
-      url: "/tools",
-      icon: Wrench,
+      title: "SEO",
+      url: "/tools?tab=seo",
+      icon: Tags,
     }
   ]
 
@@ -79,8 +85,37 @@ export function AppSidebar() {
     }
   }
 
+  const isItemActive = (itemUrl: string) => {
+    const [itemPath, itemQuery] = itemUrl.split('?');
+    const currentPath = location.pathname;
+    const currentSearch = location.search;
+    
+    // If the URL has query params, check both path and params
+    if (itemQuery) {
+      const params = new URLSearchParams('?' + itemQuery);
+      const currentParams = new URLSearchParams(currentSearch);
+      
+      if (currentPath === itemPath) {
+        for (const [key, value] of params.entries()) {
+          if (currentParams.get(key) === value) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+    
+    // For URLs without query params, check path and no conflicting query
+    if (currentPath === itemPath && !currentSearch) {
+      return true;
+    }
+    
+    return false;
+  };
+
   const handleNavigation = (url: string) => {
-    navigate(url)
+    // Force navigation even if same URL
+    navigate(url, { replace: true });
   }
 
   return (
@@ -93,22 +128,25 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    isActive={location.pathname === item.url}
-                    className={`hover:bg-sidebar-accent transition-colors cursor-pointer ${
-                      location.pathname === item.url ? 'bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90' : ''
-                    }`}
-                    onClick={() => handleNavigation(item.url)}
-                  >
-                    <div className="flex items-center gap-3 w-full">
-                      <item.icon className="w-5 h-5" />
-                      <span>{item.title}</span>
-                    </div>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {items.map((item) => {
+                const isActive = isItemActive(item.url);
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton 
+                      isActive={isActive}
+                      className={`hover:bg-sidebar-accent transition-colors cursor-pointer ${
+                        isActive ? 'bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90' : ''
+                      }`}
+                      onClick={() => handleNavigation(item.url)}
+                    >
+                      <div className="flex items-center gap-3 w-full">
+                        <item.icon className="w-5 h-5" />
+                        <span>{item.title}</span>
+                      </div>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
               
               {/* Admin Section - only visible to admin */}
               {isAdmin && (

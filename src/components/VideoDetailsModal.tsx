@@ -24,13 +24,15 @@ interface VideoDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onFavoriteUpdate?: () => void;
+  isUserVideo?: boolean; // Flag to indicate if this is from user_videos table
 }
 
 export const VideoDetailsModal: React.FC<VideoDetailsModalProps> = ({
   video,
   isOpen,
   onClose,
-  onFavoriteUpdate
+  onFavoriteUpdate,
+  isUserVideo = false
 }) => {
   const { toast } = useToast();
 
@@ -40,8 +42,11 @@ export const VideoDetailsModal: React.FC<VideoDetailsModalProps> = ({
     e.stopPropagation();
     
     try {
-      const { error } = await supabase
-        .from('videos')
+      // Use appropriate table based on isUserVideo flag
+      const tableName = isUserVideo ? 'user_videos' : 'videos';
+      
+      const { error } = await (supabase as any)
+        .from(tableName)
         .update({ is_favorite: !video.is_favorite })
         .eq('id', video.id);
 

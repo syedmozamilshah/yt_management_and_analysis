@@ -2,7 +2,7 @@
 import React from 'react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { FileText, Plus, Video, Users, Target, TrendingUp } from 'lucide-react';
+import { Plus, Video, Users, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -32,17 +32,6 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ activeSection, setActiveSection
                 </p>
               </div>
             </div>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <Button 
-              onClick={() => navigate('/?tab=title-generator')}
-              className="bg-[#cc0000] hover:bg-[#aa0000] text-white"
-              size="default"
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              Generate Title
-            </Button>
           </div>
         </div>
 
@@ -83,18 +72,6 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ activeSection, setActiveSection
           >
             <Users className="w-4 h-4" />
             Add Channel
-          </Button>
-          <Button
-            onClick={() => setActiveSection('proven-niches')}
-            variant={activeSection === 'proven-niches' ? 'default' : 'ghost'}
-            className={`flex items-center gap-2 ${
-              activeSection === 'proven-niches' 
-                ? 'bg-[#cc0000] text-white hover:bg-[#aa0000]' 
-                : 'text-[#aaaaaa] hover:text-white hover:bg-[#272727]'
-            }`}
-          >
-            <Target className="w-4 h-4" />
-            My Niches
           </Button>
         </div>
       </div>

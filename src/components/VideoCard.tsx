@@ -146,6 +146,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           onFavoriteUpdate={onFavoriteUpdate}
+          isUserVideo={isUserVideo}
         />
       </>
     );
@@ -213,6 +214,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onFavoriteUpdate={onFavoriteUpdate}
+        isUserVideo={isUserVideo}
       />
     </>
   );
