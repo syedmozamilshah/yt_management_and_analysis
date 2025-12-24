@@ -86,8 +86,8 @@ const Tools = () => {
   const [wordUsage, setWordUsage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [showLimitDialog, setShowLimitDialog] = useState(false);
-  const [scriptHistoryError, setScriptHistoryError] = useState(false);
-  const [seoHistoryError, setSeoHistoryError] = useState(false);
+  const [scriptHistoryError, setScriptHistoryError] = useState(true); // TEMPORARILY DISABLED
+  const [seoHistoryError, setSeoHistoryError] = useState(true); // TEMPORARILY DISABLED
 
   // Handle URL tab parameter
   useEffect(() => {
@@ -107,9 +107,6 @@ const Tools = () => {
         variant: "destructive",
       });
     }
-  }, [activeTab, scriptHistoryError, toast]);
-
-  useEffect(() => {
     if (activeTab === 'seo' && seoHistoryError) {
       toast({
         title: "Unable to load history",
@@ -117,20 +114,13 @@ const Tools = () => {
         variant: "destructive",
       });
     }
-  }, [activeTab, seoHistoryError, toast]);
+  }, [activeTab, scriptHistoryError, seoHistoryError]);
 
   useEffect(() => {
     if (user) {
-      // Check for cached data first
-      const cached = getCache(user.id);
-      if (cached) {
-        setScripts(cached.scripts);
-        setSeoDescriptions(cached.seoDescriptions);
-        setWordUsage(cached.wordUsage);
-        setIsLoading(false);
-      } else {
-        loadData();
-      }
+      // TEMPORARILY DISABLED: Skip cache for scripts and SEO
+      // Just load word usage
+      loadData();
     }
   }, [user]);
 
@@ -160,67 +150,17 @@ const Tools = () => {
       let loadedScripts: SavedScript[] = [];
       let loadedSeoDescriptions: SavedSeoDescription[] = [];
 
-      // TEMPORARILY DISABLED: Load scripts from Supabase
-      // Simulating history fetch failure
+      // TEMPORARILY DISABLED: Script history loading
+      // Keep scripts array empty and set error flag
+      setScripts([]);
       setScriptHistoryError(true);
-      console.error('Script history fetch temporarily disabled');
-      /*
-      const { data: scriptsData, error: scriptsError } = await (supabase as any)
-        .from('user_scripts')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
 
-      if (scriptsError) {
-        console.error('Error loading scripts:', scriptsError);
-      } else if (scriptsData) {
-        loadedScripts = scriptsData.map((s: any) => ({
-          id: s.id,
-          originalArticle: s.original_article || '',
-          outline: s.outline || '',
-          result: s.result,
-          timestamp: new Date(s.created_at).getTime(),
-          wordCount: s.word_count || 0,
-        }));
-        setScripts(loadedScripts);
-      }
-      */
-
-      // TEMPORARILY DISABLED: Load SEO descriptions from Supabase
-      // Simulating history fetch failure
+      // TEMPORARILY DISABLED: SEO history loading  
+      // Keep seoDescriptions array empty and set error flag
+      setSeoDescriptions([]);
       setSeoHistoryError(true);
-      console.error('SEO history fetch temporarily disabled');
-      /*
-      const { data: seoData, error: seoError } = await (supabase as any)
-        .from('user_seo_descriptions')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
 
-      if (seoError) {
-        console.error('Error loading SEO descriptions:', seoError);
-      } else if (seoData) {
-        loadedSeoDescriptions = seoData.map((s: any) => ({
-          id: s.id,
-          script: s.script,
-          titles: s.titles || [],
-          description: s.description,
-          tags: s.tags,
-          timestamp: new Date(s.created_at).getTime(),
-        }));
-        setSeoDescriptions(loadedSeoDescriptions);
-      }
-      */
-
-      // Cache the loaded data
-      if (user) {
-        setCache({
-          scripts: loadedScripts,
-          seoDescriptions: loadedSeoDescriptions,
-          wordUsage: loadedWordUsage,
-          userId: user.id,
-        });
-      }
+      // Don't cache since history is disabled
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -229,13 +169,17 @@ const Tools = () => {
   };
 
   const handleScriptGenerated = async (script: SavedScript) => {
-    // Prevent saving when history is disabled
+    // TEMPORARILY DISABLED: Don't save to history
     if (scriptHistoryError) {
-      toast({
-        title: "Unable to save",
-        description: "Script history is currently unavailable",
-        variant: "destructive",
-      });
+      // Still update word usage but don't save to history
+      if (script.wordCount) {
+        const updatedUsage = await addWordUsage(script.wordCount);
+        if (updatedUsage) {
+          setWordUsage(updatedUsage.wordUsage);
+        } else {
+          setWordUsage(prev => prev + script.wordCount);
+        }
+      }
       return;
     }
 
@@ -330,13 +274,8 @@ const Tools = () => {
   };
 
   const handleSeoGenerated = async (seo: SavedSeoDescription) => {
-    // Prevent saving when history is disabled
+    // TEMPORARILY DISABLED: Don't save to history
     if (seoHistoryError) {
-      toast({
-        title: "Unable to save",
-        description: "SEO history is currently unavailable",
-        variant: "destructive",
-      });
       return;
     }
 
