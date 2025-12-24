@@ -1,5 +1,5 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,8 +34,9 @@ interface AnalysisResult {
 const UserChannelAnalysis = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [channelUrl, setChannelUrl] = useState('');
-  const [daysPeriod, setDaysPeriod] = useState('90');
+  const [daysPeriod, setDaysPeriod] = useState('7');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<AnalysisResult | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<ChannelVideo | null>(null);
@@ -44,6 +45,65 @@ const UserChannelAnalysis = () => {
   const [bulkNiche, setBulkNiche] = useState('');
   const [bulkAdding, setBulkAdding] = useState(false);
   const { toast } = useToast();
+  const [autoTriggered, setAutoTriggered] = useState(false);
+
+  // Auto-trigger analysis from URL params (e.g., from sidebar Add Competitor)
+  useEffect(() => {
+    const urlChannelUrl = searchParams.get('channelUrl');
+    const urlDays = searchParams.get('days');
+    
+    if (urlChannelUrl && !autoTriggered) {
+      setChannelUrl(decodeURIComponent(urlChannelUrl));
+      if (urlDays) {
+        setDaysPeriod(urlDays);
+      }
+      setAutoTriggered(true);
+      
+      // Clear URL params after reading them
+      setSearchParams({}, { replace: true });
+      
+      // Trigger analysis after state is set
+      setTimeout(() => {
+        triggerAnalysis(decodeURIComponent(urlChannelUrl), urlDays || '90');
+      }, 100);
+    }
+  }, [searchParams, autoTriggered]);
+
+  const triggerAnalysis = async (url: string, days: string) => {
+    if (!url.trim()) return;
+
+    setLoading(true);
+    setResults(null);
+
+    try {
+      const daysValue = days === 'all' ? 3650 : parseInt(days); // Use 10 years for "all time"
+      
+      const { data, error } = await supabase.functions.invoke('get-channel-videos', {
+        body: { 
+          channelUrl: url,
+          daysPeriod: daysValue
+        }
+      });
+
+      if (error) throw error;
+
+      setResults({ ...data, daysPeriod: daysValue });
+      
+      toast({
+        title: "🎉 Videos Retrieved!",
+        description: `Found ${data.videos.length} video${data.videos.length > 1 ? 's' : ''} from ${data.channelName}`
+      });
+    } catch (error) {
+      console.error('Error fetching channel videos:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch channel videos. Please check the URL and try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,35 +117,7 @@ const UserChannelAnalysis = () => {
       return;
     }
 
-    setLoading(true);
-    setResults(null);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('get-channel-videos', {
-        body: { 
-          channelUrl,
-          daysPeriod: parseInt(daysPeriod)
-        }
-      });
-
-      if (error) throw error;
-
-      setResults({ ...data, daysPeriod: parseInt(daysPeriod) });
-      
-      toast({
-        title: "🎉 Videos Retrieved!",
-        description: `Found ${data.videos.length} video${data.videos.length > 1 ? 's' : ''} from ${data.channelName}`
-      });
-    } catch (error) {
-      console.error('Error fetching channel videos:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch channel videos. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+    await triggerAnalysis(channelUrl, daysPeriod);
   };
 
   const handleAddVideo = async () => {
@@ -230,11 +262,12 @@ const UserChannelAnalysis = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-[#212121] border-[#272727]">
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="14">Last 14 days</SelectItem>
                   <SelectItem value="30">Last 30 days</SelectItem>
                   <SelectItem value="60">Last 60 days</SelectItem>
                   <SelectItem value="90">Last 90 days</SelectItem>
-                  <SelectItem value="180">Last 180 days</SelectItem>
-                  <SelectItem value="365">Last year</SelectItem>
+                  <SelectItem value="all">All Time</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -358,7 +391,7 @@ const UserChannelAnalysis = () => {
                       </DialogTrigger>
                       <DialogContent className="bg-[#181818] border-[#272727]">
                         <DialogHeader>
-                          <DialogTitle className="text-[#f1f1f1]">Add Video</DialogTitle>
+                          <DialogTitle className="text-[#f1f1f1]">Add Competitor Video</DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4">
                           <img
@@ -382,7 +415,7 @@ const UserChannelAnalysis = () => {
                             disabled={addingVideo || !niche.trim()}
                             className="w-full bg-[#cc0000] hover:bg-[#aa0000] text-white"
                           >
-                            {addingVideo ? 'Adding...' : 'Add to My Videos'}
+                            {addingVideo ? 'Adding...' : 'Add to Competitor Videos'}
                           </Button>
                         </div>
                       </DialogContent>

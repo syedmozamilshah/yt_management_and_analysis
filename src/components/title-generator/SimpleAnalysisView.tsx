@@ -94,7 +94,7 @@ export const SimpleAnalysisView: React.FC<SimpleAnalysisViewProps> = ({
       <Card className="bg-[#181818] border-[#272727] shadow-2xl">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold text-[#f1f1f1] flex items-center justify-center gap-3">
-            <Brain className="w-8 h-8 text-[#3ea6ff]" />
+            <Brain className="w-8 h-8 text-[#cc0000]" />
             What I Found in Your Video
           </CardTitle>
           <p className="text-[#aaaaaa] text-lg">
@@ -107,14 +107,14 @@ export const SimpleAnalysisView: React.FC<SimpleAnalysisViewProps> = ({
             <div className="space-y-6">
               {/* Main Topic */}
               <div className="space-y-3">
-                <label className="text-[#3ea6ff] font-semibold text-sm uppercase tracking-wide">
+                <label className="text-[#cc0000] font-semibold text-sm uppercase tracking-wide">
                   📺 What's your video about?
                 </label>
                 {isEditing ? (
                   <Input
                     value={editedAnalysis.mainTopic}
                     onChange={(e) => setEditedAnalysis(prev => ({ ...prev, mainTopic: e.target.value }))}
-                    className="bg-[#0f0f0f] border-[#3f3f3f] text-[#f1f1f1] text-lg p-4 rounded-xl focus:border-[#3ea6ff] focus:ring-[#3ea6ff]/20"
+                    className="bg-[#0f0f0f] border-[#3f3f3f] text-[#f1f1f1] text-lg p-4 rounded-xl focus:border-[#cc0000] focus:ring-[#cc0000]/20"
                     placeholder="e.g., Making chocolate chip cookies"
                   />
                 ) : (
@@ -126,19 +126,19 @@ export const SimpleAnalysisView: React.FC<SimpleAnalysisViewProps> = ({
 
               {/* Content Type */}
               <div className="space-y-3">
-                <label className="text-[#3ea6ff] font-semibold text-sm uppercase tracking-wide">
+                <label className="text-[#cc0000] font-semibold text-sm uppercase tracking-wide">
                   🎬 What type of content?
                 </label>
                 {isEditing ? (
                   <Input
                     value={editedAnalysis.contentType}
                     onChange={(e) => setEditedAnalysis(prev => ({ ...prev, contentType: e.target.value }))}
-                    className="bg-[#0f0f0f] border-[#3f3f3f] text-[#f1f1f1] text-lg p-4 rounded-xl focus:border-[#3ea6ff] focus:ring-[#3ea6ff]/20"
+                    className="bg-[#0f0f0f] border-[#3f3f3f] text-[#f1f1f1] text-lg p-4 rounded-xl focus:border-[#cc0000] focus:ring-[#cc0000]/20"
                     placeholder="e.g., Tutorial, Review, Story"
                   />
                 ) : (
                   <div className="bg-[#272727] rounded-xl p-4 border border-[#3f3f3f]">
-                    <Badge variant="secondary" className="text-lg py-2 px-4 capitalize bg-[#3ea6ff]/20 text-[#3ea6ff] border-[#3ea6ff]/30">
+                    <Badge variant="secondary" className="text-lg py-2 px-4 capitalize bg-[#cc0000]/20 text-[#cc0000] border-[#cc0000]/30">
                       {analysis.contentType}
                     </Badge>
                   </div>
@@ -147,19 +147,19 @@ export const SimpleAnalysisView: React.FC<SimpleAnalysisViewProps> = ({
 
               {/* Category */}
               <div className="space-y-3">
-                <label className="text-[#3ea6ff] font-semibold text-sm uppercase tracking-wide">
+                <label className="text-[#cc0000] font-semibold text-sm uppercase tracking-wide">
                   📂 Video category
                 </label>
                 {isEditing ? (
                   <Input
                     value={editedAnalysis.niche}
                     onChange={(e) => setEditedAnalysis(prev => ({ ...prev, niche: e.target.value }))}
-                    className="bg-[#0f0f0f] border-[#3f3f3f] text-[#f1f1f1] text-lg p-4 rounded-xl focus:border-[#3ea6ff] focus:ring-[#3ea6ff]/20"
+                    className="bg-[#0f0f0f] border-[#3f3f3f] text-[#f1f1f1] text-lg p-4 rounded-xl focus:border-[#cc0000] focus:ring-[#cc0000]/20"
                     placeholder="e.g., Cooking, Gaming, Education"
                   />
                 ) : (
                   <div className="bg-[#272727] rounded-xl p-4 border border-[#3f3f3f]">
-                    <Badge variant="outline" className="text-lg py-2 px-4 capitalize border-[#3ea6ff]/30 text-[#3ea6ff]">
+                    <Badge variant="outline" className="text-lg py-2 px-4 capitalize border-[#cc0000]/30 text-[#cc0000]">
                       {analysis.niche || 'General'}
                     </Badge>
                   </div>
@@ -172,7 +172,7 @@ export const SimpleAnalysisView: React.FC<SimpleAnalysisViewProps> = ({
               {/* Authority Mode Toggle */}
               {isEditing && (
                 <div className="space-y-3">
-                  <label className="text-[#3ea6ff] font-semibold text-sm uppercase tracking-wide">
+                  <label className="text-[#cc0000] font-semibold text-sm uppercase tracking-wide">
                     👤 Authority Type
                   </label>
                   <div className="flex gap-3">
@@ -181,8 +181,8 @@ export const SimpleAnalysisView: React.FC<SimpleAnalysisViewProps> = ({
                       variant={!editedAnalysis.authorityVsAuthority ? 'default' : 'outline'}
                       onClick={() => !editedAnalysis.authorityVsAuthority || toggleAuthorityVsMode()}
                       className={`flex-1 ${!editedAnalysis.authorityVsAuthority 
-                        ? 'bg-[#3ea6ff] text-white hover:bg-[#3ea6ff]/90' 
-                        : 'bg-[#272727] border-[#3ea6ff]/30 text-[#3ea6ff] hover:bg-[#3ea6ff]/20'
+                        ? 'bg-[#cc0000] text-white hover:bg-[#aa0000]' 
+                        : 'bg-[#272727] border-[#cc0000]/30 text-[#cc0000] hover:bg-[#cc0000]/20'
                       } rounded-xl py-3 text-sm font-medium`}
                     >
                       <UserCheck className="w-4 h-4 mr-2" />
@@ -208,14 +208,14 @@ export const SimpleAnalysisView: React.FC<SimpleAnalysisViewProps> = ({
               {!editedAnalysis.authorityVsAuthority ? (
                 /* Single Authority Mode */
                 <div className="space-y-3">
-                  <label className="text-[#3ea6ff] font-semibold text-sm uppercase tracking-wide">
+                  <label className="text-[#cc0000] font-semibold text-sm uppercase tracking-wide">
                     🌟 Main person or brand mentioned
                   </label>
                   {isEditing ? (
                     <Input
                       value={editedAnalysis.mainAuthority}
                       onChange={(e) => setEditedAnalysis(prev => ({ ...prev, mainAuthority: e.target.value }))}
-                      className="bg-[#0f0f0f] border-[#3f3f3f] text-[#f1f1f1] text-lg p-4 rounded-xl focus:border-[#3ea6ff] focus:ring-[#3ea6ff]/20"
+                      className="bg-[#0f0f0f] border-[#3f3f3f] text-[#f1f1f1] text-lg p-4 rounded-xl focus:border-[#cc0000] focus:ring-[#cc0000]/20"
                       placeholder="e.g., Gordon Ramsay, Nike, Me"
                     />
                   ) : (
@@ -341,7 +341,7 @@ export const SimpleAnalysisView: React.FC<SimpleAnalysisViewProps> = ({
                 <Button
                   onClick={() => setIsEditing(true)}
                   variant="outline"
-                  className="border-[#3ea6ff]/30 text-[#3ea6ff] hover:bg-[#3ea6ff]/20 px-8 py-4 rounded-xl text-lg font-semibold bg-[#272727]"
+                  className="border-[#cc0000]/30 text-[#cc0000] hover:bg-[#cc0000]/20 px-8 py-4 rounded-xl text-lg font-semibold bg-[#272727]"
                 >
                   <Edit3 className="w-5 h-5 mr-2" />
                   Edit Details

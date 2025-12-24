@@ -58,7 +58,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ activeSection, setActiveSecti
             }`}
           >
             <Plus className="w-4 h-4" />
-            Add Video
+            Add Competitor Video
           </Button>
           <Button
             onClick={() => setActiveSection('channel-analysis')}
@@ -70,7 +70,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ activeSection, setActiveSecti
             }`}
           >
             <Users className="w-4 h-4" />
-            Add Channel
+            Add Competitor Channel
           </Button>
           <Button
             onClick={() => setActiveSection('proven-niches')}

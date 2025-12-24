@@ -146,7 +146,7 @@ const Favorites = () => {
                   <DialogTrigger asChild>
                     <Button className="bg-[#cc0000] hover:bg-[#aa0000] text-white">
                       <Plus className="w-4 h-4 mr-2" />
-                      Add Video
+                      Add Competitor Video
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="bg-[#181818] border-[#272727] text-[#f1f1f1]">
@@ -161,23 +161,23 @@ const Favorites = () => {
                 <div className="flex items-center gap-3 mb-3">
                   <Heart className="w-8 h-8 text-[#cc0000] fill-[#cc0000]" />
                   <h1 className="text-4xl font-bold text-[#f1f1f1]">
-                    Favorite Videos
+                    Favorite Competitor Videos
                   </h1>
                 </div>
-                <p className="text-[#aaaaaa] text-lg">Your starred video collection</p>
+                <p className="text-[#aaaaaa] text-lg">Your starred competitor video collection</p>
               </div>
               
               {videos.length === 0 ? (
                 <div className="text-center py-16">
                   <div className="bg-[#212121] rounded-2xl p-12 max-w-md mx-auto border border-[#272727]">
                     <Heart className="w-16 h-16 text-[#cc0000] mx-auto mb-4" />
-                    <p className="text-[#f1f1f1] text-xl font-medium mb-2">No favorite videos yet</p>
-                    <p className="text-[#aaaaaa] mb-6">Start adding some favorites to see them here!</p>
+                    <p className="text-[#f1f1f1] text-xl font-medium mb-2">No favorite competitors yet</p>
+                    <p className="text-[#aaaaaa] mb-6">Start adding some competitor videos to see them here!</p>
                     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                       <DialogTrigger asChild>
                         <Button className="bg-[#cc0000] hover:bg-[#aa0000] text-white">
                           <Plus className="w-4 h-4 mr-2" />
-                          Add Your First Video
+                          Add First Competitor Video
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="bg-[#181818] border-[#272727] text-[#f1f1f1]">

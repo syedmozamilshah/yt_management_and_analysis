@@ -11,7 +11,7 @@ import { ScriptInput } from '@/components/title-generator/ScriptInput';
 import { SimpleAnalysisView } from '@/components/title-generator/SimpleAnalysisView';
 import { TitleResults } from '@/components/title-generator/TitleResults';
 import { Badge } from '@/components/ui/badge';
-import { Wand2, Database, Globe } from 'lucide-react';
+import { Database, Globe } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Helper function to log AI tool usage
@@ -199,49 +199,42 @@ const TitleGenerator = () => {
         <AppSidebar />
         <SidebarInset className="flex-1">
           <div className="min-h-screen bg-[#0f0f0f]">
-            {/* Header */}
-            <div className="bg-[#1e293b]/80 border-b border-[#334155]/50">
-              <div className="container mx-auto px-6 py-8">
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-3 mb-4">
-                    <div className="w-12 h-12 bg-[#3b82f6] rounded-xl flex items-center justify-center">
-                      <Wand2 className="w-7 h-7 text-white" />
-                    </div>
-                    <h1 className="text-4xl font-bold text-white">Generate Title</h1>
-                    {isAdmin && (
-                      <Badge 
-                        variant="outline" 
-                        className={`ml-2 ${
-                          adminDataMode === 'all-data' 
-                            ? 'border-green-500 text-green-400 bg-green-500/10' 
-                            : 'border-blue-500 text-blue-400 bg-blue-500/10'
-                        }`}
-                      >
-                        {adminDataMode === 'all-data' ? (
-                          <><Globe className="w-3 h-3 mr-1" /> All Data</>
-                        ) : (
-                          <><Database className="w-3 h-3 mr-1" /> My Data</>
-                        )}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-[#94a3b8] text-xl max-w-2xl mx-auto">
-                    Turn your video idea into click-worthy titles using patterns from your chosen database!
-                  </p>
-                  <p className="text-[#64748b] text-sm mt-2">
-                    Choose between viral outliers or your personal favorites
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Progress Steps */}
-            <div className="container mx-auto px-6 py-8">
-              <WizardSteps currentStep={currentStep} steps={steps} />
-            </div>
-
             {/* Main Content */}
-            <div className="container mx-auto px-6 pb-12">
+            <div className="container mx-auto px-6 py-8">
+              {/* Header - Left aligned like Script Generator */}
+              <header className="mb-6 sm:mb-8">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <h1 className="text-2xl sm:text-3xl font-bold text-white">Generate Title</h1>
+                      {isAdmin && (
+                        <Badge 
+                          variant="outline" 
+                          className={`${
+                            adminDataMode === 'all-data' 
+                              ? 'border-green-500 text-green-400 bg-green-500/10' 
+                              : 'border-blue-500 text-blue-400 bg-blue-500/10'
+                          }`}
+                        >
+                          {adminDataMode === 'all-data' ? (
+                            <><Globe className="w-3 h-3 mr-1" /> All Data</>
+                          ) : (
+                            <><Database className="w-3 h-3 mr-1" /> My Data</>
+                          )}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm sm:text-base text-[#aaaaaa]">
+                      {steps[currentStep]}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Progress Steps */}
+                <WizardSteps currentStep={currentStep} steps={steps} />
+              </header>
+
+              {/* Step Content */}
               {currentStep === 0 && (
                 <DataSourceSelection
                   onSourceSelect={handleDataSourceSelect}

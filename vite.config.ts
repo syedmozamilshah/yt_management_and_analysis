@@ -8,6 +8,14 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    proxy: {
+      '/api/scrapingbee': {
+        target: 'https://app.scrapingbee.com/api/v1',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/scrapingbee/, ''),
+        secure: true,
+      },
+    },
   },
   plugins: [
     react(),

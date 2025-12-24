@@ -20,13 +20,13 @@ export const ScriptInput: React.FC<ScriptInputProps> = ({
 }) => {
   return (
     <div className="max-w-4xl mx-auto">
-      <Card className="bg-[#1e293b] border-[#334155] shadow-2xl">
+      <Card className="bg-[#181818] border-[#272727] shadow-2xl">
         <CardHeader className="text-center pb-6">
           <CardTitle className="text-3xl font-bold text-white flex items-center justify-center gap-3">
-            <FileText className="w-8 h-8 text-[#3b82f6]" />
+            <FileText className="w-8 h-8 text-[#cc0000]" />
             Paste Your Script
           </CardTitle>
-          <p className="text-[#94a3b8] text-lg mt-2">
+          <p className="text-[#aaaaaa] text-lg mt-2">
             Just paste your script, description, or tell me what your video is about!
           </p>
         </CardHeader>
@@ -36,10 +36,10 @@ export const ScriptInput: React.FC<ScriptInputProps> = ({
               value={script}
               onChange={(e) => onScriptChange(e.target.value)}
               placeholder="Hi! I made a video about how to make the perfect chocolate chip cookies. It shows 5 simple steps that anyone can follow at home..."
-              className="min-h-[160px] bg-[#0f172a] border-[#475569] text-white placeholder:text-[#64748b] text-lg p-6 rounded-xl resize-none focus:border-[#3b82f6] focus:ring-[#3b82f6]/20"
+              className="min-h-[160px] bg-[#0f0f0f] border-[#404040] text-white placeholder:text-[#666666] text-lg p-6 rounded-xl resize-none focus:border-[#cc0000] focus:ring-[#cc0000]/20"
               disabled={isAnalyzing}
             />
-            <div className="absolute bottom-4 right-4 text-[#64748b] text-sm">
+            <div className="absolute bottom-4 right-4 text-[#666666] text-sm">
               {script.length}/1000
             </div>
           </div>
@@ -49,7 +49,7 @@ export const ScriptInput: React.FC<ScriptInputProps> = ({
               onClick={onAnalyze}
               disabled={!script.trim() || isAnalyzing}
               size="lg"
-              className="bg-[#3b82f6] hover:bg-[#2563eb] text-white px-12 py-4 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-[#cc0000] hover:bg-[#aa0000] text-white px-12 py-4 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isAnalyzing ? (
                 <>

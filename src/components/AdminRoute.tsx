@@ -18,9 +18,9 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
     );
   }
 
-  // Not logged in - redirect to auth
+  // Not logged in - redirect to admin login
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/admin" replace />;
   }
 
   // Logged in but not admin - redirect to home

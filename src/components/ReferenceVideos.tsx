@@ -12,15 +12,15 @@ interface ReferenceVideosProps {
 export const ReferenceVideos: React.FC<ReferenceVideosProps> = ({ videos }) => {
   if (videos.length === 0) {
     return (
-      <Card className="glass-effect border-blue-500/30 h-full">
+      <Card className="bg-[#181818] border-[#272727] h-full">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-blue-400" />
+            <TrendingUp className="w-5 h-5 text-[#cc0000]" />
             Reference Videos
           </CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-64">
-          <p className="text-blue-300 text-center">
+          <p className="text-[#aaaaaa] text-center">
             Generate titles to see successful videos from your database that inspired the AI suggestions
           </p>
         </CardContent>
@@ -29,13 +29,13 @@ export const ReferenceVideos: React.FC<ReferenceVideosProps> = ({ videos }) => {
   }
 
   return (
-    <Card className="glass-effect border-blue-500/30 h-full">
+    <Card className="bg-[#181818] border-[#272727] h-full">
       <CardHeader>
         <CardTitle className="text-white flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-blue-400" />
+          <TrendingUp className="w-5 h-5 text-[#cc0000]" />
           Reference Videos ({videos.length})
         </CardTitle>
-        <p className="text-blue-200 text-sm">
+        <p className="text-[#aaaaaa] text-sm">
           Successful videos that inspired the AI title suggestions
         </p>
       </CardHeader>
@@ -49,7 +49,7 @@ export const ReferenceVideos: React.FC<ReferenceVideosProps> = ({ videos }) => {
           return (
             <div
               key={video.id || index}
-              className="p-4 bg-slate-800/30 rounded-lg border border-blue-500/20 hover:border-blue-500/40 transition-colors cursor-pointer"
+              className="p-4 bg-[#0f0f0f] rounded-lg border border-[#404040] hover:border-[#cc0000]/50 transition-colors cursor-pointer"
               onClick={() => window.open(video.youtube_url, '_blank')}
             >
               <div className="flex gap-3">
@@ -69,19 +69,19 @@ export const ReferenceVideos: React.FC<ReferenceVideosProps> = ({ videos }) => {
                   </h4>
                   
                   {video.channel_name && (
-                    <p className="text-blue-200 text-xs mb-1">{video.channel_name}</p>
+                    <p className="text-[#aaaaaa] text-xs mb-1">{video.channel_name}</p>
                   )}
 
                   <div className="flex items-center gap-3 text-xs">
                     {video.view_count && (
-                      <div className="flex items-center gap-1 text-blue-300">
+                      <div className="flex items-center gap-1 text-[#aaaaaa]">
                         <Eye className="w-3 h-3" />
                         <span>{formatNumber(video.view_count)}</span>
                       </div>
                     )}
                     
                     {video.channel_subscribers && (
-                      <div className="flex items-center gap-1 text-blue-300/70">
+                      <div className="flex items-center gap-1 text-[#666666]">
                         <Users className="w-3 h-3" />
                         <span>{formatNumber(video.channel_subscribers)}</span>
                       </div>
@@ -96,7 +96,7 @@ export const ReferenceVideos: React.FC<ReferenceVideosProps> = ({ videos }) => {
 
                   {video.niche && (
                     <div className="mt-2">
-                      <span className="inline-block bg-gradient-to-r from-blue-600 to-blue-700 text-blue-100 text-xs font-semibold px-2 py-1 rounded-full border border-blue-500/30">
+                      <span className="inline-block bg-gradient-to-r from-[#cc0000] to-[#aa0000] text-white text-xs font-semibold px-2 py-1 rounded-full border border-[#cc0000]/30">
                         {video.niche.toUpperCase()}
                       </span>
                     </div>

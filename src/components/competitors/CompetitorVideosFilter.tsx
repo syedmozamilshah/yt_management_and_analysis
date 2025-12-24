@@ -29,6 +29,7 @@ export const CompetitorVideosFilter: React.FC<CompetitorVideosFilterProps> = ({
           <SelectItem value="30d" className="text-[#f1f1f1] hover:bg-[#cc0000] focus:bg-[#cc0000]">Last 30 Days</SelectItem>
           <SelectItem value="60d" className="text-[#f1f1f1] hover:bg-[#cc0000] focus:bg-[#cc0000]">Last 60 Days</SelectItem>
           <SelectItem value="90d" className="text-[#f1f1f1] hover:bg-[#cc0000] focus:bg-[#cc0000]">Last 90 Days</SelectItem>
+          <SelectItem value="all" className="text-[#f1f1f1] hover:bg-[#cc0000] focus:bg-[#cc0000]">All Time</SelectItem>
         </SelectContent>
       </Select>
     </div>

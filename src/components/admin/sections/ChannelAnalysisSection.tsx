@@ -11,7 +11,7 @@ const ChannelAnalysisSection = () => {
         <div className="w-20 h-20 bg-[#cc0000] rounded-full flex items-center justify-center mx-auto mb-4">
           <Plus className="w-10 h-10 text-white" />
         </div>
-        <h2 className="text-3xl font-bold text-[#f1f1f1] mb-2">Add Channel Videos 📺</h2>
+        <h2 className="text-3xl font-bold text-[#f1f1f1] mb-2">Add Competitor Channel Videos 📺</h2>
         <p className="text-[#aaaaaa] text-lg">
           Import all videos from any YouTube channel for a selected time period
         </p>

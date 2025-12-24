@@ -172,9 +172,9 @@ const UserVideoManagement = () => {
         <Card className="bg-[#181818] border-[#272727]">
           <CardContent className="p-12 text-center">
             <div className="text-6xl mb-4">📹</div>
-            <h3 className="text-2xl font-bold text-[#f1f1f1] mb-2">No Videos Yet!</h3>
+            <h3 className="text-2xl font-bold text-[#f1f1f1] mb-2">No Competitor Videos Yet!</h3>
             <p className="text-[#aaaaaa] mb-4">
-              Start by adding some YouTube videos to your collection
+              Start by adding some competitor YouTube videos to your collection
             </p>
           </CardContent>
         </Card>
@@ -227,7 +227,7 @@ const UserVideoManagement = () => {
           <Card className="bg-[#181818] border-[#272727]">
             <CardHeader>
               <CardTitle className="text-[#f1f1f1]">
-                My Videos ({filteredVideos.length})
+                Competitor Videos ({filteredVideos.length})
               </CardTitle>
             </CardHeader>
             <CardContent>

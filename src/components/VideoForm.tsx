@@ -184,7 +184,7 @@ export const VideoForm: React.FC<VideoFormProps> = ({ onVideoAdded }) => {
             </div>
           )}
           <Button type="submit" disabled={loading} className="w-full">
-            {loading ? 'Adding...' : 'Add Video'}
+            {loading ? 'Adding...' : 'Add Competitor Video'}
           </Button>
         </form>
       </CardContent>

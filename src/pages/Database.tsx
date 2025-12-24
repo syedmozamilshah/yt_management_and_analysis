@@ -74,7 +74,7 @@ const Database = () => {
                       size="default"
                     >
                       <Plus className="w-4 h-4 mr-2" />
-                      Add Video
+                      Add Competitor Video
                     </Button>
                   </div>
                 </div>

@@ -115,7 +115,7 @@ export const CompetitorChannelForm: React.FC<CompetitorChannelFormProps> = ({
             ) : (
               <>
                 <Plus className="w-4 h-4 mr-2" />
-                Add Channel
+                Add Competitor Channel
               </>
             )}
           </Button>

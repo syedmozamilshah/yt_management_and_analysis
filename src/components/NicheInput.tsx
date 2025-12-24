@@ -28,10 +28,10 @@ export const NicheInput: React.FC<NicheInputProps> = ({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
-        className="bg-slate-800/50 border-blue-500/30 text-white placeholder:text-blue-300/60 focus:border-blue-400/50"
+        className="bg-[#181818] border-[#404040] text-white placeholder:text-[#666666] focus:border-[#cc0000] focus:ring-1 focus:ring-[#cc0000]"
         required
       />
-      <p className="text-blue-300/60 text-xs">
+      <p className="text-[#aaaaaa] text-xs">
         Enter the content category or sport type for this video
       </p>
     </div>

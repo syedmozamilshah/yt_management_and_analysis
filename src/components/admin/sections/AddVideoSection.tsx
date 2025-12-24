@@ -15,7 +15,7 @@ const AddVideoSection: React.FC<AddVideoSectionProps> = ({ onVideoAdded }) => {
         <div className="w-20 h-20 bg-[#cc0000] rounded-full flex items-center justify-center mx-auto mb-4">
           <Plus className="w-10 h-10 text-white" />
         </div>
-        <h2 className="text-3xl font-bold text-[#f1f1f1] mb-2">Add a New Video 📹</h2>
+        <h2 className="text-3xl font-bold text-[#f1f1f1] mb-2">Add a New Competitor Video 📹</h2>
         <p className="text-[#aaaaaa] text-lg">
           Paste any YouTube video URL and we'll save it to your collection
         </p>
@@ -23,7 +23,7 @@ const AddVideoSection: React.FC<AddVideoSectionProps> = ({ onVideoAdded }) => {
 
       <Card className="bg-[#181818] border-[#272727] max-w-2xl mx-auto">
         <CardHeader className="text-center">
-          <CardTitle className="text-[#f1f1f1] text-xl">Add YouTube Video</CardTitle>
+          <CardTitle className="text-[#f1f1f1] text-xl">Add Competitor Video</CardTitle>
           <p className="text-[#aaaaaa] text-sm">
             Just paste a YouTube link and we'll do the rest! ✨
           </p>
@@ -41,7 +41,7 @@ const AddVideoSection: React.FC<AddVideoSectionProps> = ({ onVideoAdded }) => {
               <li>• Copy any YouTube video URL</li>
               <li>• Paste it in the form above</li>
               <li>• Choose a category for your video</li>
-              <li>• Click "Add Video" and you're done!</li>
+              <li>• Click "Add Competitor Video" and you're done!</li>
             </ul>
           </CardContent>
         </Card>

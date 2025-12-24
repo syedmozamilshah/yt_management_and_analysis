@@ -26,7 +26,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ activeSection, setActiveSection
                 <TrendingUp className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-[#f1f1f1]">My Dashboard</h1>
+                <h1 className="text-2xl font-bold text-[#f1f1f1]">My Competitors</h1>
                 <p className="text-[#aaaaaa] text-sm truncate max-w-[200px]">
                   {user?.email}
                 </p>
@@ -47,7 +47,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ activeSection, setActiveSection
             }`}
           >
             <Video className="w-4 h-4" />
-            My Videos
+            Competitor Videos
           </Button>
           <Button
             onClick={() => setActiveSection('add-video')}
@@ -59,7 +59,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ activeSection, setActiveSection
             }`}
           >
             <Plus className="w-4 h-4" />
-            Add Video
+            Add Competitor Video
           </Button>
           <Button
             onClick={() => setActiveSection('channel-analysis')}
@@ -71,7 +71,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ activeSection, setActiveSection
             }`}
           >
             <Users className="w-4 h-4" />
-            Add Channel
+            Add Competitor Channel
           </Button>
         </div>
       </div>

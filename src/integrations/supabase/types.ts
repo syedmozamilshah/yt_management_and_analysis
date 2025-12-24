@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      competitor_analyses: {
+        Row: {
+          id: string
+          user_id: string
+          source_channel_id: string
+          source_channel_name: string
+          source_channel_handle: string | null
+          source_channel_thumbnail: string | null
+          similar_channels: Json
+          total_channels_found: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          source_channel_id: string
+          source_channel_name: string
+          source_channel_handle?: string | null
+          source_channel_thumbnail?: string | null
+          similar_channels?: Json
+          total_channels_found?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          source_channel_id?: string
+          source_channel_name?: string
+          source_channel_handle?: string | null
+          source_channel_thumbnail?: string | null
+          similar_channels?: Json
+          total_channels_found?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       channel_update_logs: {
         Row: {
           api_calls_used: number | null

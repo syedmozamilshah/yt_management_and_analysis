@@ -87,11 +87,11 @@ export const EditableScriptAnalysis: React.FC<EditableScriptAnalysisProps> = ({
   };
 
   return (
-    <Card className="glass-effect border-blue-500/30">
+    <Card className="bg-[#181818] border-[#272727]">
       <CardHeader>
         <CardTitle className="text-white flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Brain className="w-5 h-5 text-blue-400" />
+            <Brain className="w-5 h-5 text-[#cc0000]" />
             Script Analysis
           </div>
           <div className="flex gap-2">
@@ -122,7 +122,7 @@ export const EditableScriptAnalysis: React.FC<EditableScriptAnalysisProps> = ({
                   setIsEditing(true);
                   onEdit();
                 }}
-                className="text-blue-400 hover:text-blue-300"
+                className="text-[#cc0000] hover:text-[#aa0000]"
               >
                 <Edit3 className="w-4 h-4" />
               </Button>
@@ -135,15 +135,15 @@ export const EditableScriptAnalysis: React.FC<EditableScriptAnalysisProps> = ({
           <div className="space-y-4">
             {/* Main Topic */}
             <div className="space-y-2">
-              <label className="text-blue-400 text-sm font-medium">Main Topic</label>
+              <label className="text-[#aaaaaa] text-sm font-medium">Main Topic</label>
               {isEditing ? (
                 <Input
                   value={editedAnalysis.mainTopic}
                   onChange={(e) => setEditedAnalysis(prev => ({ ...prev, mainTopic: e.target.value }))}
-                  className="bg-slate-800/50 border-blue-500/30 text-white"
+                  className="bg-[#0f0f0f] border-[#404040] text-white focus:border-[#cc0000]"
                 />
               ) : (
-                <div className="bg-slate-800/30 rounded-lg p-3 border border-blue-500/20">
+                <div className="bg-[#0f0f0f] rounded-lg p-3 border border-[#404040]">
                   <div className="text-white text-sm">{analysis.mainTopic}</div>
                 </div>
               )}
@@ -151,15 +151,15 @@ export const EditableScriptAnalysis: React.FC<EditableScriptAnalysisProps> = ({
 
             {/* Content Type */}
             <div className="space-y-2">
-              <label className="text-blue-400 text-sm font-medium">Content Type</label>
+              <label className="text-[#aaaaaa] text-sm font-medium">Content Type</label>
               {isEditing ? (
                 <Input
                   value={editedAnalysis.contentType}
                   onChange={(e) => setEditedAnalysis(prev => ({ ...prev, contentType: e.target.value }))}
-                  className="bg-slate-800/50 border-blue-500/30 text-white"
+                  className="bg-[#0f0f0f] border-[#404040] text-white focus:border-[#cc0000]"
                 />
               ) : (
-                <div className="bg-slate-800/30 rounded-lg p-3 border border-blue-500/20">
+                <div className="bg-[#0f0f0f] rounded-lg p-3 border border-[#404040]">
                   <div className="text-white text-sm capitalize">{analysis.contentType}</div>
                 </div>
               )}
@@ -167,15 +167,15 @@ export const EditableScriptAnalysis: React.FC<EditableScriptAnalysisProps> = ({
 
             {/* Niche */}
             <div className="space-y-2">
-              <label className="text-blue-400 text-sm font-medium">Niche</label>
+              <label className="text-[#aaaaaa] text-sm font-medium">Niche</label>
               {isEditing ? (
                 <Input
                   value={editedAnalysis.niche}
                   onChange={(e) => setEditedAnalysis(prev => ({ ...prev, niche: e.target.value }))}
-                  className="bg-slate-800/50 border-blue-500/30 text-white"
+                  className="bg-[#0f0f0f] border-[#404040] text-white focus:border-[#cc0000]"
                 />
               ) : (
-                <div className="bg-slate-800/30 rounded-lg p-3 border border-blue-500/20">
+                <div className="bg-[#0f0f0f] rounded-lg p-3 border border-[#404040]">
                   <div className="text-white text-sm capitalize">{analysis.niche || 'General'}</div>
                 </div>
               )}
@@ -186,15 +186,15 @@ export const EditableScriptAnalysis: React.FC<EditableScriptAnalysisProps> = ({
             {/* Authority Mode Toggle */}
             {isEditing && (
               <div className="space-y-2">
-                <label className="text-blue-400 text-sm font-medium">Authority Type</label>
+                <label className="text-[#aaaaaa] text-sm font-medium">Authority Type</label>
                 <div className="flex gap-2">
                   <Button
                     type="button"
                     variant={!editedAnalysis.authorityVsAuthority ? 'default' : 'outline'}
                     onClick={() => !editedAnalysis.authorityVsAuthority || toggleAuthorityVsMode()}
                     className={`${!editedAnalysis.authorityVsAuthority 
-                      ? 'bg-blue-500 text-white' 
-                      : 'bg-slate-800/50 border-blue-500/30 text-blue-300 hover:bg-blue-500/20'
+                      ? 'bg-[#cc0000] text-white' 
+                      : 'bg-[#0f0f0f] border-[#404040] text-[#aaaaaa] hover:bg-[#cc0000]/20'
                     }`}
                   >
                     <UserCheck className="w-4 h-4 mr-2" />
@@ -205,8 +205,8 @@ export const EditableScriptAnalysis: React.FC<EditableScriptAnalysisProps> = ({
                     variant={editedAnalysis.authorityVsAuthority ? 'default' : 'outline'}
                     onClick={() => editedAnalysis.authorityVsAuthority || toggleAuthorityVsMode()}
                     className={`${editedAnalysis.authorityVsAuthority 
-                      ? 'bg-blue-500 text-white' 
-                      : 'bg-slate-800/50 border-blue-500/30 text-blue-300 hover:bg-blue-500/20'
+                      ? 'bg-[#cc0000] text-white' 
+                      : 'bg-[#0f0f0f] border-[#404040] text-[#aaaaaa] hover:bg-[#cc0000]/20'
                     }`}
                   >
                     <Swords className="w-4 h-4 mr-2" />
@@ -219,16 +219,16 @@ export const EditableScriptAnalysis: React.FC<EditableScriptAnalysisProps> = ({
             {/* Main Authority or Authority vs Authority */}
             {!editedAnalysis.authorityVsAuthority ? (
               <div className="space-y-2">
-                <label className="text-blue-400 text-sm font-medium">Main Authority</label>
+                <label className="text-[#aaaaaa] text-sm font-medium">Main Authority</label>
                 {isEditing ? (
                   <Input
                     value={editedAnalysis.mainAuthority}
                     onChange={(e) => setEditedAnalysis(prev => ({ ...prev, mainAuthority: e.target.value }))}
-                    className="bg-slate-800/50 border-blue-500/30 text-white"
+                    className="bg-[#0f0f0f] border-[#404040] text-white focus:border-[#cc0000]"
                     placeholder="e.g., Elon Musk, Apple, Joe Rogan"
                   />
                 ) : (
-                  <div className="bg-slate-800/30 rounded-lg p-3 border border-blue-500/20">
+                  <div className="bg-[#0f0f0f] rounded-lg p-3 border border-[#404040]">
                     <div className="text-white text-sm">{analysis.mainAuthority || 'None detected'}</div>
                   </div>
                 )}
@@ -236,31 +236,31 @@ export const EditableScriptAnalysis: React.FC<EditableScriptAnalysisProps> = ({
             ) : (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-blue-400 text-sm font-medium">Authority vs Authority</label>
+                  <label className="text-[#aaaaaa] text-sm font-medium">Authority vs Authority</label>
                   {isEditing ? (
                     <div className="space-y-3">
                       <Input
                         value={editedAnalysis.authorityVsAuthority?.authority1 || ''}
                         onChange={(e) => updateAuthorityVs('authority1', e.target.value)}
-                        className="bg-slate-800/50 border-blue-500/30 text-white"
+                        className="bg-[#0f0f0f] border-[#404040] text-white focus:border-[#cc0000]"
                         placeholder="First authority"
                       />
                       <Input
                         value={editedAnalysis.authorityVsAuthority?.authority2 || ''}
                         onChange={(e) => updateAuthorityVs('authority2', e.target.value)}
-                        className="bg-slate-800/50 border-blue-500/30 text-white"
+                        className="bg-[#0f0f0f] border-[#404040] text-white focus:border-[#cc0000]"
                         placeholder="Second authority"
                       />
                       <Select
                         value={editedAnalysis.authorityVsAuthority?.relationship || 'other'}
                         onValueChange={(value) => updateAuthorityVs('relationship', value)}
                       >
-                        <SelectTrigger className="bg-slate-800/50 border-blue-500/30 text-white">
+                        <SelectTrigger className="bg-[#0f0f0f] border-[#404040] text-white focus:border-[#cc0000]">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent className="bg-slate-800 border-blue-500/30">
+                        <SelectContent className="bg-[#181818] border-[#404040]">
                           {relationshipTypes.map(type => (
-                            <SelectItem key={type} value={type} className="text-white hover:bg-blue-500/20">
+                            <SelectItem key={type} value={type} className="text-white hover:bg-[#cc0000]/20">
                               {type}
                             </SelectItem>
                           ))}
@@ -268,15 +268,15 @@ export const EditableScriptAnalysis: React.FC<EditableScriptAnalysisProps> = ({
                       </Select>
                     </div>
                   ) : (
-                    <div className="bg-slate-800/30 rounded-lg p-3 border border-blue-500/20">
+                    <div className="bg-[#0f0f0f] rounded-lg p-3 border border-[#404040]">
                       {analysis.authorityVsAuthority ? (
                         <div className="space-y-1">
                           <div className="text-white text-sm">
-                            <span className="text-blue-300">{analysis.authorityVsAuthority.authority1}</span>
+                            <span className="text-[#cc0000]">{analysis.authorityVsAuthority.authority1}</span>
                             {' vs '}
-                            <span className="text-blue-300">{analysis.authorityVsAuthority.authority2}</span>
+                            <span className="text-[#cc0000]">{analysis.authorityVsAuthority.authority2}</span>
                           </div>
-                          <div className="text-blue-400 text-xs capitalize">
+                          <div className="text-[#aaaaaa] text-xs capitalize">
                             {analysis.authorityVsAuthority.relationship}
                           </div>
                         </div>

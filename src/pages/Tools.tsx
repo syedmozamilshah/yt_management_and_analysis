@@ -4,13 +4,35 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { getWordUsage, addWordUsage, subtractWordUsage } from '@/lib/toolUsageApi';
-import ToolsHistorySidebar, { SavedScript, SavedSeoDescription } from '@/components/tools/ToolsHistorySidebar';
+import { SavedScript, SavedSeoDescription } from '@/components/tools/ToolsHistorySidebar';
 import ScriptGenerator from '@/components/tools/ScriptGenerator';
 import SeoGenerator from '@/components/tools/SeoGenerator';
+import CompetitorFinder from '@/components/tools/CompetitorFinder';
+import { CompetitorAnalysis, deleteCompetitorAnalysis } from '@/services/competitorHistoryService';
 import { Button } from '@/components/ui/button';
-import { Menu, X } from 'lucide-react';
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
-import { AppSidebar } from '@/components/AppSidebar';
+import { ArrowLeft, FileText, Sparkles, Trash2, Plus, AlertCircle, Users, Target } from 'lucide-react';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarFooter,
+  SidebarHeader,
+} from "@/components/ui/sidebar";
+import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const MAX_WORDS = 40000;
 
@@ -54,20 +76,24 @@ const Tools = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<"script" | "seo">("script");
+  const [activeTab, setActiveTab] = useState<"script" | "seo" | "competitor">("script");
   const [scripts, setScripts] = useState<SavedScript[]>([]);
   const [seoDescriptions, setSeoDescriptions] = useState<SavedSeoDescription[]>([]);
+  const [competitorHistory, setCompetitorHistory] = useState<CompetitorAnalysis[]>([]);
+  const [selectedCompetitorItem, setSelectedCompetitorItem] = useState<CompetitorAnalysis | null>(null);
   const [currentScriptId, setCurrentScriptId] = useState<string>();
   const [currentSeoId, setCurrentSeoId] = useState<string>();
   const [wordUsage, setWordUsage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [showLimitDialog, setShowLimitDialog] = useState(false);
+  const [scriptHistoryError, setScriptHistoryError] = useState(false);
+  const [seoHistoryError, setSeoHistoryError] = useState(false);
 
   // Handle URL tab parameter
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
-    if (tab === 'script' || tab === 'seo') {
+    if (tab === 'script' || tab === 'seo' || tab === 'competitor') {
       setActiveTab(tab);
     }
   }, [location.search]);
@@ -113,7 +139,11 @@ const Tools = () => {
       let loadedScripts: SavedScript[] = [];
       let loadedSeoDescriptions: SavedSeoDescription[] = [];
 
-      // Load scripts from Supabase
+      // TEMPORARILY DISABLED: Load scripts from Supabase
+      // Simulating history fetch failure
+      setScriptHistoryError(true);
+      console.error('Script history fetch temporarily disabled');
+      /*
       const { data: scriptsData, error: scriptsError } = await (supabase as any)
         .from('user_scripts')
         .select('*')
@@ -133,8 +163,13 @@ const Tools = () => {
         }));
         setScripts(loadedScripts);
       }
+      */
 
-      // Load SEO descriptions from Supabase
+      // TEMPORARILY DISABLED: Load SEO descriptions from Supabase
+      // Simulating history fetch failure
+      setSeoHistoryError(true);
+      console.error('SEO history fetch temporarily disabled');
+      /*
       const { data: seoData, error: seoError } = await (supabase as any)
         .from('user_seo_descriptions')
         .select('*')
@@ -154,6 +189,7 @@ const Tools = () => {
         }));
         setSeoDescriptions(loadedSeoDescriptions);
       }
+      */
 
       // Cache the loaded data
       if (user) {
@@ -341,6 +377,10 @@ const Tools = () => {
   };
 
   const handleNewScript = () => {
+    if (isLimitReached) {
+      setShowLimitDialog(true);
+      return;
+    }
     setCurrentScriptId(undefined);
     setActiveTab("script");
   };
@@ -350,6 +390,29 @@ const Tools = () => {
     setActiveTab("seo");
   };
 
+  const handleBackToIdeation = () => {
+    navigate('/');
+  };
+
+  const isLimitReached = wordUsage >= MAX_WORDS;
+
+  const getScriptTitle = (script: SavedScript) => {
+    const article = script.originalArticle || "";
+    return article.substring(0, 40) + (article.length > 40 ? "..." : "");
+  };
+
+  const getSeoTitle = (item: SavedSeoDescription) => {
+    if (item.titles?.length) return item.titles[0].substring(0, 40) + (item.titles[0].length > 40 ? "..." : "");
+    return item.description.substring(0, 40) + (item.description.length > 40 ? "..." : "");
+  };
+
+  const getNextResetDate = () => {
+    const nextMonth = new Date();
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    nextMonth.setDate(1);
+    return nextMonth.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  };
+
   const currentScript = scripts.find(s => s.id === currentScriptId) || null;
   const currentSeo = seoDescriptions.find(s => s.id === currentSeoId) || null;
 
@@ -357,51 +420,36 @@ const Tools = () => {
     return (
       <SidebarProvider>
         <div className="min-h-screen flex w-full bg-[#0f0f0f]">
-          <AppSidebar />
+          {/* History Sidebar */}
+          <Sidebar className="border-r border-[#272727]">
+            <SidebarHeader className="p-4 border-b border-[#272727]">
+              <div className="w-10 h-10 bg-[#272727] rounded-lg animate-pulse mb-3" />
+              <div className="w-full h-6 bg-[#272727] rounded-lg animate-pulse" />
+            </SidebarHeader>
+            <SidebarContent>
+              <div className="p-4 space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="h-16 bg-[#272727] rounded-lg animate-pulse" />
+                ))}
+              </div>
+            </SidebarContent>
+          </Sidebar>
           <SidebarInset className="flex-1">
-            <div className="min-h-screen bg-[#0a0a0a] flex flex-col">
-              {/* Header skeleton */}
-              <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#181818]/95 border-b border-[#272727]">
-                <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
-                  <div className="flex items-center gap-2 sm:gap-4">
-                    <div className="w-10 h-10 bg-[#272727] rounded-lg animate-pulse" />
-                    <div className="w-20 h-8 bg-[#272727] rounded-lg animate-pulse" />
-                    <div className="h-6 w-px bg-[#272727] hidden sm:block" />
-                    <div className="w-24 h-6 bg-[#272727] rounded animate-pulse" />
-                  </div>
-                  <div className="w-10 h-10 bg-[#272727] rounded-lg animate-pulse" />
-                </div>
-              </header>
-
+            <div className="min-h-screen bg-[#0f0f0f] flex flex-col">
               {/* Content skeleton */}
-              <div className="flex-1 p-4 sm:p-6 lg:p-8">
+              <div className="flex-1 container mx-auto px-6 py-8">
                 <div className="max-w-4xl mx-auto space-y-6">
-                  {/* Title skeleton */}
                   <div className="text-center space-y-4">
                     <div className="w-16 h-16 bg-[#272727] rounded-full mx-auto animate-pulse" />
                     <div className="w-64 h-8 bg-[#272727] rounded mx-auto animate-pulse" />
-                    <div className="w-96 h-4 bg-[#272727] rounded mx-auto animate-pulse" />
                   </div>
-
-                  {/* Card skeletons */}
                   <div className="space-y-4 mt-8">
-                    <div className="bg-[#181818] border border-[#272727] rounded-xl p-6 animate-pulse">
-                      <div className="w-32 h-5 bg-[#272727] rounded mb-4" />
-                      <div className="h-32 bg-[#272727] rounded-lg" />
-                    </div>
-                    <div className="bg-[#181818] border border-[#272727] rounded-xl p-6 animate-pulse">
-                      <div className="w-40 h-5 bg-[#272727] rounded mb-4" />
-                      <div className="h-24 bg-[#272727] rounded-lg" />
-                    </div>
-                    <div className="bg-[#181818] border border-[#272727] rounded-xl p-6 animate-pulse">
-                      <div className="w-28 h-5 bg-[#272727] rounded mb-4" />
-                      <div className="h-20 bg-[#272727] rounded-lg" />
-                    </div>
-                  </div>
-
-                  {/* Button skeleton */}
-                  <div className="flex justify-center mt-6">
-                    <div className="w-40 h-12 bg-[#272727] rounded-lg animate-pulse" />
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="bg-[#181818] border border-[#272727] rounded-xl p-6 animate-pulse">
+                        <div className="w-32 h-5 bg-[#272727] rounded mb-4" />
+                        <div className="h-24 bg-[#272727] rounded-lg" />
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -413,86 +461,289 @@ const Tools = () => {
   }
 
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-[#0f0f0f]">
-        <AppSidebar />
-        <SidebarInset className="flex-1">
-          <div className="min-h-screen bg-[#0a0a0a] flex flex-col">
-            {/* Header with navigation */}
-            <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#181818]/95 border-b border-[#272727]">
-              <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
-                <div className="flex items-center gap-2 sm:gap-4">
-                  <SidebarTrigger className="text-[#f1f1f1] hover:bg-[#272727] rounded-lg p-2 transition-all" />
-                  <h1 className="text-lg sm:text-xl font-semibold text-white">
-                    AI Tools
-                  </h1>
-                </div>
-                
-                {/* Tools sidebar toggle - visible on all screens */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowMobileSidebar(!showMobileSidebar)}
-                  className="text-[#aaaaaa] hover:text-white hover:bg-[#272727]"
-                >
-                  {showMobileSidebar ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-                </Button>
-              </div>
-            </header>
-
-            {/* Main content area */}
-            <div className="flex-1 flex relative">
-              {/* Sidebar overlay */}
-              {showMobileSidebar && (
-                <div 
-                  className="fixed inset-0 bg-black/50 z-40"
-                  onClick={() => setShowMobileSidebar(false)}
-                />
-              )}
+    <>
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full bg-[#0f0f0f]">
+          {/* Custom History Sidebar */}
+          <Sidebar className="border-r border-[#272727]">
+            <SidebarHeader className="p-4 border-b border-[#272727]">
+              {/* Back button - icon only */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleBackToIdeation}
+                className="text-[#aaaaaa] hover:text-white hover:bg-[#272727] mb-3"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
               
-              {/* Tools History Sidebar - slides in from left on all screens */}
-              <div className={`
-                fixed inset-y-0 left-0 z-50
-                transform transition-transform duration-300 ease-in-out
-                ${showMobileSidebar ? 'translate-x-0' : '-translate-x-full'}
-                w-72 sm:w-80 flex-shrink-0
-              `}>
-                <ToolsHistorySidebar
-                  scripts={scripts}
-                  seoDescriptions={seoDescriptions}
-                  onSelectScript={(script) => {
-                    handleSelectScript(script);
-                    setShowMobileSidebar(false);
-                  }}
-                  onDeleteScript={handleDeleteScript}
-                  onSelectSeo={(seo) => {
-                    handleSelectSeo(seo);
-                    setShowMobileSidebar(false);
-                  }}
-                  onDeleteSeo={handleDeleteSeo}
-                  onNewScript={() => {
-                    handleNewScript();
-                    setShowMobileSidebar(false);
-                  }}
-                  onNewSeo={() => {
-                    handleNewSeo();
-                    setShowMobileSidebar(false);
-                  }}
-                  wordUsage={wordUsage}
-                  maxWords={MAX_WORDS}
-                  currentScriptId={currentScriptId}
-                  currentSeoId={currentSeoId}
-                  activeTab={activeTab}
-                  setActiveTab={(tab) => {
-                    setActiveTab(tab);
-                    setShowMobileSidebar(false);
-                  }}
-                />
+              {/* Tool Title */}
+              <div className="flex items-center gap-2">
+                {activeTab === "script" ? (
+                  <>
+                    <FileText className="w-5 h-5 text-[#cc0000]" />
+                    <span className="text-lg font-semibold text-[#f1f1f1]">Script Generator</span>
+                  </>
+                ) : activeTab === "seo" ? (
+                  <>
+                    <Sparkles className="w-5 h-5 text-[#cc0000]" />
+                    <span className="text-lg font-semibold text-[#f1f1f1]">SEO Generator</span>
+                  </>
+                ) : (
+                  <>
+                    <Users className="w-5 h-5 text-[#cc0000]" />
+                    <span className="text-lg font-semibold text-[#f1f1f1]">Competitor Finder</span>
+                  </>
+                )}
               </div>
+            </SidebarHeader>
+            
+            <SidebarContent>
+              <SidebarGroup>
+                {/* New button - Only show for script and seo tabs */}
+                {activeTab !== "competitor" && (
+                  <div className="p-4">
+                    <Button
+                      className="w-full bg-[#cc0000] hover:bg-[#aa0000] text-white"
+                      onClick={activeTab === "script" ? handleNewScript : handleNewSeo}
+                      disabled={activeTab === "script" && isLimitReached}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      {activeTab === "script" ? "New Script" : "New SEO"}
+                    </Button>
+                  </div>
+                )}
 
-              {/* Main Generator Area */}
+                {/* Competitor finder info */}
+                {activeTab === "competitor" && (
+                  <div className="px-4 py-4">
+                    <div className="p-3 rounded-lg bg-[#181818] border border-[#272727]">
+                      <p className="text-sm text-[#aaaaaa]">
+                        Find similar YouTube channels based on content analysis.
+                      </p>
+                      <p className="text-xs text-[#666666] mt-2">
+                        Enter a channel URL or @handle to discover competitors.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Word Limit Indicator - Only show for Script tab */}
+                {activeTab === "script" && (
+                  <div className="px-4 pb-4">
+                    <div className="p-3 rounded-lg bg-[#181818] border border-[#272727]">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-[#aaaaaa]">Monthly Limit</span>
+                        <span className="text-xs text-[#666666]">
+                          {wordUsage.toLocaleString()} / {MAX_WORDS.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="w-full bg-[#272727] rounded-full h-2 overflow-hidden">
+                        <div
+                          className={cn(
+                            "h-full transition-all duration-300",
+                            (wordUsage / MAX_WORDS) < 0.7
+                              ? "bg-[#cc0000]"
+                              : (wordUsage / MAX_WORDS) < 0.9
+                              ? "bg-yellow-500"
+                              : "bg-red-600"
+                          )}
+                          style={{ width: `${Math.min((wordUsage / MAX_WORDS) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-[#666666] mt-2">
+                        {Math.round((wordUsage / MAX_WORDS) * 100)}% used
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <SidebarGroupLabel className="px-4 text-xs text-[#666666] uppercase tracking-wider">
+                  History
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {activeTab === "script" ? (
+                      scriptHistoryError ? (
+                        <div className="px-4 py-6 text-red-500 text-sm">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4" />
+                            <p>History fetch failed</p>
+                          </div>
+                          <p className="text-xs mt-2 text-[#666666]">Unable to load script history</p>
+                        </div>
+                      ) : scripts.length === 0 ? (
+                        <div className="px-4 py-6 text-[#666666] text-sm">
+                          <p>No scripts yet</p>
+                          <p className="text-xs mt-2">Generate a script to see it here</p>
+                        </div>
+                      ) : (
+                        scripts.map((script) => {
+                          const isActive = currentScriptId === script.id;
+                          const title = getScriptTitle(script);
+
+                          return (
+                            <SidebarMenuItem key={script.id}>
+                              <div
+                                className={cn(
+                                  "group relative rounded-lg transition-colors hover:bg-[#181818] mx-2",
+                                  isActive && "bg-[#cc0000]/10 border border-[#cc0000]/20"
+                                )}
+                              >
+                                <SidebarMenuButton
+                                  onClick={() => handleSelectScript(script)}
+                                  className="w-full text-left px-3 py-2"
+                                >
+                                  <div className="flex items-center gap-2 text-sm text-[#aaaaaa]">
+                                    <FileText className="h-4 w-4 text-[#666666] flex-shrink-0" />
+                                    <span className="truncate flex-1">{title || "Untitled Script"}</span>
+                                  </div>
+                                </SidebarMenuButton>
+                                <div className="hidden group-hover:flex absolute right-2 top-1/2 -translate-y-1/2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-[#666666] hover:text-red-500"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteScript(script.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                <div className="px-3 text-xs text-[#666666] pb-2">
+                                  {new Date(script.timestamp).toLocaleDateString()}
+                                  {script.wordCount && ` • ${script.wordCount.toLocaleString()} words`}
+                                </div>
+                              </div>
+                            </SidebarMenuItem>
+                          );
+                        })
+                      )
+                    ) : activeTab === "seo" ? (
+                      seoHistoryError ? (
+                        <div className="px-4 py-6 text-red-500 text-sm">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4" />
+                            <p>History fetch failed</p>
+                          </div>
+                          <p className="text-xs mt-2 text-[#666666]">Unable to load SEO history</p>
+                        </div>
+                      ) : seoDescriptions.length === 0 ? (
+                        <div className="px-4 py-6 text-[#666666] text-sm">
+                          <p>No SEO descriptions yet</p>
+                          <p className="text-xs mt-2">Generate SEO content to see it here</p>
+                        </div>
+                      ) : (
+                        seoDescriptions.map((item) => {
+                          const isActive = currentSeoId === item.id;
+                          const title = getSeoTitle(item);
+
+                          return (
+                            <SidebarMenuItem key={item.id}>
+                              <div
+                                className={cn(
+                                  "group relative rounded-lg transition-colors hover:bg-[#181818] mx-2",
+                                  isActive && "bg-[#cc0000]/10 border border-[#cc0000]/20"
+                                )}
+                              >
+                                <SidebarMenuButton
+                                  onClick={() => handleSelectSeo(item)}
+                                  className="w-full text-left px-3 py-2"
+                                >
+                                  <div className="flex items-center gap-2 text-sm text-[#aaaaaa]">
+                                    <Sparkles className="h-4 w-4 text-[#666666] flex-shrink-0" />
+                                    <span className="truncate flex-1">{title}</span>
+                                  </div>
+                                </SidebarMenuButton>
+                                <div className="hidden group-hover:flex absolute right-2 top-1/2 -translate-y-1/2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-[#666666] hover:text-red-500"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteSeo(item.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                <div className="px-3 text-xs text-[#666666] pb-2">
+                                  {new Date(item.timestamp).toLocaleDateString()}
+                                </div>
+                              </div>
+                            </SidebarMenuItem>
+                          );
+                        })
+                      )
+                    ) : (
+                      competitorHistory.length === 0 ? (
+                        <div className="px-4 py-6 text-[#666666] text-sm">
+                          <p>No competitor analyses yet</p>
+                          <p className="text-xs mt-2">Analyze a channel to see history here</p>
+                        </div>
+                      ) : (
+                        competitorHistory.map((item) => {
+                          return (
+                            <SidebarMenuItem key={item.id}>
+                              <div
+                                className="group relative rounded-lg transition-colors hover:bg-[#181818] mx-2"
+                              >
+                                <SidebarMenuButton
+                                  onClick={() => setSelectedCompetitorItem(item)}
+                                  className="w-full text-left px-3 py-2"
+                                >
+                                  <div className="flex items-center gap-2 text-sm text-[#aaaaaa]">
+                                    <Target className="h-4 w-4 text-[#666666] flex-shrink-0" />
+                                    <span className="truncate flex-1">{item.source_channel_name}</span>
+                                  </div>
+                                </SidebarMenuButton>
+                                <div className="hidden group-hover:flex absolute right-2 top-1/2 -translate-y-1/2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-[#666666] hover:text-red-500"
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      const success = await deleteCompetitorAnalysis(item.id);
+                                      if (success) {
+                                        setCompetitorHistory(prev => prev.filter(h => h.id !== item.id));
+                                        toast({
+                                          title: "Deleted",
+                                          description: "Analysis removed from history",
+                                        });
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                <div className="px-3 text-xs text-[#666666] pb-2">
+                                  {item.total_channels_found} competitors • {new Date(item.created_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                            </SidebarMenuItem>
+                          );
+                        })
+                      )
+                    )}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </SidebarContent>
+
+            <SidebarFooter className="border-t border-[#272727] p-4">
+              <p className="text-xs text-[#666666]">Video Stash AI Tools</p>
+            </SidebarFooter>
+          </Sidebar>
+
+          {/* Main Content Area */}
+          <SidebarInset className="flex-1">
+            <div className="min-h-screen bg-[#0f0f0f] flex flex-col">
               <div className="flex-1 overflow-auto min-h-0">
-                <div className="p-4 sm:p-6 lg:p-8">
+                <div className="container mx-auto px-6 py-8">
                   {activeTab === "script" ? (
                     <ScriptGenerator
                       onScriptGenerated={handleScriptGenerated}
@@ -501,19 +752,56 @@ const Tools = () => {
                       maxWords={MAX_WORDS}
                       onUpdateUsage={setWordUsage}
                     />
-                  ) : (
+                  ) : activeTab === "seo" ? (
                     <SeoGenerator
                       onSeoGenerated={handleSeoGenerated}
                       currentSeo={currentSeo}
+                    />
+                  ) : (
+                    <CompetitorFinder 
+                      onHistoryChange={setCompetitorHistory}
+                      selectedHistoryItem={selectedCompetitorItem}
+                      onClearSelectedHistory={() => setSelectedCompetitorItem(null)}
                     />
                   )}
                 </div>
               </div>
             </div>
-          </div>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+
+      {/* Limit Reached Dialog */}
+      <AlertDialog open={showLimitDialog} onOpenChange={setShowLimitDialog}>
+        <AlertDialogContent className="bg-[#0f0f0f] border-[#272727]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-white">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              Monthly Limit Reached
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2 text-[#aaaaaa]">
+              <p>
+                You have exhausted your <span className="font-semibold text-white">{MAX_WORDS.toLocaleString()} word limit</span> for this month.
+              </p>
+              <p>
+                Your limit will automatically reset on <span className="font-semibold text-white">{getNextResetDate()}</span>.
+              </p>
+              <p className="text-xs text-[#666666] mt-4">
+                Current usage: {wordUsage.toLocaleString()} / {MAX_WORDS.toLocaleString()} words
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button 
+              onClick={() => setShowLimitDialog(false)}
+              className="bg-[#cc0000] hover:bg-[#aa0000] text-white"
+            >
+              Okay
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
 

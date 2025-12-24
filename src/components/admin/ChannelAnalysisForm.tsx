@@ -340,7 +340,7 @@ const ChannelAnalysisForm = () => {
                             </DialogTrigger>
                             <DialogContent className="bg-[#181818] border-[#272727] text-white">
                               <DialogHeader>
-                                <DialogTitle className="text-white">Add Video to Database</DialogTitle>
+                                <DialogTitle className="text-white">Add Competitor Video to Database</DialogTitle>
                               </DialogHeader>
                               <div className="space-y-4">
                                 <div className="text-[#aaaaaa] text-sm">
@@ -357,7 +357,7 @@ const ChannelAnalysisForm = () => {
                                     disabled={addingVideo || !niche.trim()}
                                     className="flex-1 bg-[#cc0000] hover:bg-[#aa0000] text-white"
                                   >
-                                    {addingVideo ? 'Adding...' : 'Add Video'}
+                                    {addingVideo ? 'Adding...' : 'Add Competitor Video'}
                                   </Button>
                                 </div>
                               </div>

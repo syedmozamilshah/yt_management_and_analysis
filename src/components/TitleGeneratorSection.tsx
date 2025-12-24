@@ -224,14 +224,9 @@ export const TitleGeneratorSection = () => {
     <div className="space-y-8">
       {/* Header */}
       <div className="bg-[#181818] border border-[#272727] rounded-2xl p-8">
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-[#cc0000] rounded-xl flex items-center justify-center">
-              <Wand2 className="w-7 h-7 text-white" />
-            </div>
-            <h2 className="text-4xl font-bold text-[#f1f1f1]">Generate Title</h2>
-          </div>
-          <p className="text-[#aaaaaa] text-xl max-w-2xl mx-auto">
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-[#f1f1f1] mb-4">Generate Title</h2>
+          <p className="text-[#aaaaaa] text-lg max-w-2xl">
             We scan successful video titles from viral outliers to generate customized titles for you
           </p>
         </div>

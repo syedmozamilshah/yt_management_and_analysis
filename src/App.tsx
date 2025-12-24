@@ -9,11 +9,11 @@ import Index from "./pages/Index";
 import Admin from "./pages/Admin";
 import AdminStats from "./pages/AdminStats";
 import Home from "./pages/Home";
-import Viewboard from "./pages/Viewboard";
 import Favorites from "./pages/Favorites";
 import Competitors from "./pages/Competitors";
 import Tools from "./pages/Tools";
 import Auth from "./pages/Auth";
+import AdminAuth from "./pages/AdminAuth";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
@@ -34,13 +34,15 @@ const App = () => (
             {/* Protected routes for authenticated users */}
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-            <Route path="/viewboard" element={<ProtectedRoute><Viewboard /></ProtectedRoute>} />
             <Route path="/favorites" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
             <Route path="/competitors" element={<ProtectedRoute><Competitors /></ProtectedRoute>} />
             <Route path="/tools" element={<ProtectedRoute><Tools /></ProtectedRoute>} />
             
-            {/* Admin only routes */}
-            <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
+            {/* Admin login route - email/password based */}
+            <Route path="/admin" element={<AdminAuth />} />
+            
+            {/* Admin only routes - protected dashboard */}
+            <Route path="/admin/dashboard" element={<AdminRoute><Admin /></AdminRoute>} />
             <Route path="/admin-stats" element={<AdminRoute><AdminStats /></AdminRoute>} />
             
             <Route path="*" element={<NotFound />} />

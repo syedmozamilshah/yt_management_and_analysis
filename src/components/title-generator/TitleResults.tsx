@@ -83,7 +83,7 @@ export const TitleResults: React.FC<TitleResultsProps> = ({
       icon: <Sparkles className="w-8 h-8 text-white" />,
       title: "Mission Accomplished! 🚀",
       description: `Your AI-powered titles are ready! Analyzed ${videosAnalyzedCount} viral outlier videos.`,
-      color: "3ea6ff"
+      color: "cc0000"
     };
   };
 
@@ -93,15 +93,15 @@ export const TitleResults: React.FC<TitleResultsProps> = ({
     <div className="max-w-7xl mx-auto space-y-8 px-4">
       {/* Hero Section */}
       <div className="text-center relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 rounded-3xl blur-3xl"></div>
-        <div className="relative bg-slate-900/50 backdrop-blur-sm rounded-3xl p-8 border border-blue-500/20">
+        <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 via-red-600/10 to-red-700/10 rounded-3xl blur-3xl"></div>
+        <div className="relative bg-[#181818] backdrop-blur-sm rounded-3xl p-8 border border-[#cc0000]/20">
           <div className="flex items-center justify-center gap-4 mb-6">
-            <div className={`w-16 h-16 bg-gradient-to-r ${dataSource === 'favorites' ? 'from-red-500 to-pink-500' : 'from-green-500 to-blue-500'} rounded-full flex items-center justify-center animate-pulse`}>
+            <div className={`w-16 h-16 bg-gradient-to-r ${dataSource === 'favorites' ? 'from-red-500 to-red-600' : 'from-red-600 to-red-700'} rounded-full flex items-center justify-center animate-pulse`}>
               {sourceInfo.icon}
             </div>
             <div>
               <h2 className="text-4xl font-bold text-white mb-2">{sourceInfo.title}</h2>
-              <p className="text-blue-200 text-xl">
+              <p className="text-[#aaaaaa] text-xl">
                 {sourceInfo.description}
               </p>
             </div>
@@ -111,7 +111,7 @@ export const TitleResults: React.FC<TitleResultsProps> = ({
           <div className="flex justify-center mb-4">
             <Badge className={`text-lg py-2 px-6 ${dataSource === 'favorites' 
               ? 'bg-[#cc0000]/20 text-[#cc0000] border-[#cc0000]/30' 
-              : 'bg-[#3ea6ff]/20 text-[#3ea6ff] border-[#3ea6ff]/30'
+              : 'bg-[#cc0000]/20 text-[#cc0000] border-[#cc0000]/30'
             }`}>
               {dataSource === 'favorites' ? (
                 <>
@@ -129,8 +129,8 @@ export const TitleResults: React.FC<TitleResultsProps> = ({
 
           {/* Quick Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-            <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-xl p-4 border border-blue-500/30">
-              <div className="text-blue-400 text-sm font-medium">Titles Generated</div>
+            <div className="bg-gradient-to-br from-[#cc0000]/20 to-[#aa0000]/20 rounded-xl p-4 border border-[#cc0000]/30">
+              <div className="text-[#cc0000] text-sm font-medium">Titles Generated</div>
               <div className="text-white text-2xl font-bold">{titles.length}</div>
             </div>
             <div className="bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-xl p-4 border border-green-500/30">
@@ -151,8 +151,8 @@ export const TitleResults: React.FC<TitleResultsProps> = ({
 
       {/* Main Dashboard */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 bg-slate-800/50 border-blue-500/30">
-          <TabsTrigger value="titles" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+        <TabsList className="grid w-full grid-cols-3 bg-[#181818] border-[#272727]">
+          <TabsTrigger value="titles" className="data-[state=active]:bg-[#cc0000] data-[state=active]:text-white">
             <Star className="w-4 h-4 mr-2" />
             Your Titles
           </TabsTrigger>
@@ -168,14 +168,14 @@ export const TitleResults: React.FC<TitleResultsProps> = ({
 
         {/* Your Titles Tab */}
         <TabsContent value="titles" className="space-y-6">
-          <Card className="glass-effect border-blue-500/30 shadow-2xl">
+          <Card className="bg-[#181818] border-[#272727] shadow-2xl">
             <CardHeader>
               <CardTitle className="text-2xl font-bold text-white flex items-center gap-3">
                 <Star className="w-7 h-7 text-yellow-400" />
                 Your Optimized Titles ({titles.length})
                 <Badge className="bg-green-500/20 text-green-300 border-green-500/30">Ready to Use!</Badge>
               </CardTitle>
-              <p className="text-blue-200 text-lg">
+              <p className="text-[#aaaaaa] text-lg">
                 Each title is crafted using proven patterns from {dataSource === 'favorites' ? `your ${videosAnalyzedCount} favorite videos` : `${videosAnalyzedCount} successful viral videos`}
               </p>
             </CardHeader>
@@ -183,7 +183,7 @@ export const TitleResults: React.FC<TitleResultsProps> = ({
               {titles.map((titleData, index) => (
                 <div
                   key={index}
-                  className="group p-6 bg-slate-800/30 rounded-xl border border-blue-500/20 hover:border-blue-400 transition-all duration-300 cursor-pointer hover:bg-slate-800/50 hover:shadow-lg"
+                  className="group p-6 bg-[#0f0f0f] rounded-xl border border-[#404040] hover:border-[#cc0000] transition-all duration-300 cursor-pointer hover:bg-[#181818] hover:shadow-lg"
                   onClick={() => copyTitle(titleData.title)}
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -191,19 +191,19 @@ export const TitleResults: React.FC<TitleResultsProps> = ({
                       <div className="flex items-center gap-3 mb-3">
                         <Badge variant="secondary" className="text-sm font-bold">#{index + 1}</Badge>
                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Copy className="w-4 h-4 text-blue-400" />
-                          <span className="text-blue-400 text-sm font-medium">Click to copy</span>
+                          <Copy className="w-4 h-4 text-[#cc0000]" />
+                          <span className="text-[#cc0000] text-sm font-medium">Click to copy</span>
                         </div>
                       </div>
-                      <p className="text-white text-xl font-medium leading-relaxed group-hover:text-blue-100 transition-colors mb-4">
+                      <p className="text-white text-xl font-medium leading-relaxed group-hover:text-[#f1f1f1] transition-colors mb-4">
                         {titleData.title}
                       </p>
                       
                       {/* Title Analysis */}
                       {titleData.adaptedFrom && (
-                        <div className="bg-slate-700/30 rounded-lg p-3 mb-3">
-                          <div className="text-blue-400 text-sm font-medium mb-1">Adapted from successful video:</div>
-                          <div className="text-blue-200 text-sm italic">"{titleData.adaptedFrom}"</div>
+                        <div className="bg-[#212121] rounded-lg p-3 mb-3">
+                          <div className="text-[#cc0000] text-sm font-medium mb-1">Adapted from successful video:</div>
+                          <div className="text-[#aaaaaa] text-sm italic">"{titleData.adaptedFrom}"</div>
                         </div>
                       )}
                       

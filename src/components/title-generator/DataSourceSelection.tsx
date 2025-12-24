@@ -86,7 +86,7 @@ export const DataSourceSelection: React.FC<DataSourceSelectionProps> = ({
       <Card className="bg-[#181818] border-[#272727] shadow-2xl">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold text-[#f1f1f1] flex items-center justify-center gap-3">
-            <Database className="w-8 h-8 text-[#3ea6ff]" />
+            <Database className="w-8 h-8 text-[#cc0000]" />
             Choose Your Data Source
           </CardTitle>
           <p className="text-[#aaaaaa] text-lg">
@@ -99,14 +99,14 @@ export const DataSourceSelection: React.FC<DataSourceSelectionProps> = ({
             <div
               className={`p-6 rounded-xl border-2 cursor-pointer transition-all duration-300 ${
                 selectedSource === 'outliers'
-                  ? 'border-[#3ea6ff] bg-[#3ea6ff]/10'
-                  : 'border-[#3f3f3f] bg-[#272727] hover:border-[#3ea6ff]/50'
+                  ? 'border-[#cc0000] bg-[#cc0000]/10'
+                  : 'border-[#3f3f3f] bg-[#272727] hover:border-[#cc0000]/50'
               }`}
               onClick={() => onSourceSelect('outliers')}
             >
               <div className="flex items-center justify-between mb-4">
-                <TrendingUp className="w-8 h-8 text-[#3ea6ff]" />
-                <Badge className="bg-[#3ea6ff]/20 text-[#3ea6ff] border-[#3ea6ff]/30">
+                <TrendingUp className="w-8 h-8 text-[#cc0000]" />
+                <Badge className="bg-[#cc0000]/20 text-[#cc0000] border-[#cc0000]/30">
                   Recommended
                 </Badge>
               </div>
@@ -120,15 +120,15 @@ export const DataSourceSelection: React.FC<DataSourceSelectionProps> = ({
                 }
               </p>
               <div className="flex items-center gap-2 mb-2">
-                <Users className="w-4 h-4 text-[#3ea6ff]" />
+                <Users className="w-4 h-4 text-[#cc0000]" />
                 <span className="text-[#f1f1f1] font-medium">
                   {loading ? '...' : outliersCount.toLocaleString()} videos available
                 </span>
               </div>
-              <div className="text-[#3ea6ff] text-sm">
+              <div className="text-[#cc0000] text-sm">
                 ✓ Proven viral patterns
               </div>
-              <div className="text-[#3ea6ff] text-sm">
+              <div className="text-[#cc0000] text-sm">
                 ✓ Cross-niche insights
               </div>
             </div>
@@ -194,7 +194,7 @@ export const DataSourceSelection: React.FC<DataSourceSelectionProps> = ({
               size="lg"
               className={`px-12 py-4 text-lg font-semibold rounded-xl transition-all duration-300 ${
                 selectedSource
-                  ? 'bg-[#3ea6ff] hover:bg-[#3ea6ff]/90 text-white shadow-lg hover:shadow-xl'
+                  ? 'bg-[#cc0000] hover:bg-[#aa0000] text-white shadow-lg hover:shadow-xl'
                   : 'bg-[#3f3f3f] text-[#aaaaaa] cursor-not-allowed'
               }`}
             >

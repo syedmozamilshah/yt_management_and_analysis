@@ -99,28 +99,35 @@ const Competitors = () => {
     try {
       const channelNames = channels.map(channel => channel.channel_name);
       
-      // Calculate date filter
-      const now = new Date();
-      const daysAgo = parseInt(selectedDuration.replace('d', ''));
-      const dateFilter = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000)).toISOString();
+      // Calculate date filter (skip for "all" time)
+      const isAllTime = selectedDuration === 'all';
+      let dateFilter: string | null = null;
+      if (!isAllTime) {
+        const now = new Date();
+        const daysAgo = parseInt(selectedDuration.replace('d', ''));
+        dateFilter = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000)).toISOString();
+      }
 
       if (shouldQueryAllData()) {
         // Admin in "all-data" mode: fetch from both tables
+        let globalQuery = supabase
+          .from('videos')
+          .select('*')
+          .in('channel_name', channelNames);
+        
+        let userQuery = (supabase as any)
+          .from('user_videos')
+          .select('*')
+          .in('channel_name', channelNames);
+        
+        if (dateFilter) {
+          globalQuery = globalQuery.gte('upload_date', dateFilter);
+          userQuery = userQuery.gte('upload_date', dateFilter);
+        }
+        
         const [globalResult, userResult] = await Promise.all([
-          supabase
-            .from('videos')
-            .select('*')
-            .in('channel_name', channelNames)
-            .gte('upload_date', dateFilter)
-            .order('view_count', { ascending: false })
-            .limit(50),
-          (supabase as any)
-            .from('user_videos')
-            .select('*')
-            .in('channel_name', channelNames)
-            .gte('upload_date', dateFilter)
-            .order('view_count', { ascending: false })
-            .limit(50)
+          globalQuery.order('view_count', { ascending: false }).limit(50),
+          userQuery.order('view_count', { ascending: false }).limit(50)
         ]);
 
         if (globalResult.error) throw globalResult.error;
@@ -132,12 +139,17 @@ const Competitors = () => {
         setVideos(allVideos.slice(0, 50));
       } else if (user?.id) {
         // Regular users OR admin in "my-data" mode
-        const { data, error } = await (supabase as any)
+        let query = (supabase as any)
           .from('user_videos')
           .select('*')
           .eq('user_id', user.id)
-          .in('channel_name', channelNames)
-          .gte('upload_date', dateFilter)
+          .in('channel_name', channelNames);
+        
+        if (dateFilter) {
+          query = query.gte('upload_date', dateFilter);
+        }
+        
+        const { data, error } = await query
           .order('view_count', { ascending: false })
           .limit(50);
 

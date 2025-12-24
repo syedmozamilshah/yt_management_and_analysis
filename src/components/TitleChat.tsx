@@ -96,11 +96,11 @@ export const TitleChat: React.FC<TitleChatProps> = ({ onTitlesGenerated }) => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-900/50 rounded-lg border border-blue-500/30">
+    <div className="h-full flex flex-col bg-[#0f0f0f] rounded-lg border border-[#272727]">
       {/* Chat Header */}
-      <div className="p-4 border-b border-blue-500/30">
+      <div className="p-4 border-b border-[#272727]">
         <div className="flex items-center gap-2">
-          <Bot className="w-5 h-5 text-blue-400" />
+          <Bot className="w-5 h-5 text-[#cc0000]" />
           <h3 className="text-white font-semibold">AI Title Generator</h3>
         </div>
       </div>
@@ -116,8 +116,8 @@ export const TitleChat: React.FC<TitleChatProps> = ({ onTitlesGenerated }) => {
           >
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
               message.type === 'user' 
-                ? 'bg-blue-500' 
-                : 'bg-gradient-to-r from-purple-500 to-blue-500'
+                ? 'bg-[#cc0000]' 
+                : 'bg-gradient-to-r from-[#cc0000] to-[#aa0000]'
             }`}>
               {message.type === 'user' ? (
                 <User className="w-4 h-4 text-white" />
@@ -127,8 +127,8 @@ export const TitleChat: React.FC<TitleChatProps> = ({ onTitlesGenerated }) => {
             </div>
             <div className={`max-w-[80%] p-3 rounded-lg ${
               message.type === 'user'
-                ? 'bg-blue-500 text-white'
-                : 'bg-slate-800 text-blue-100 border border-blue-500/30'
+                ? 'bg-[#cc0000] text-white'
+                : 'bg-[#181818] text-[#f1f1f1] border border-[#272727]'
             }`}>
               <p className="whitespace-pre-wrap text-sm leading-relaxed">
                 {message.content}
@@ -141,15 +141,15 @@ export const TitleChat: React.FC<TitleChatProps> = ({ onTitlesGenerated }) => {
         ))}
         {isLoading && (
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#cc0000] to-[#aa0000] flex items-center justify-center">
               <Bot className="w-4 h-4 text-white" />
             </div>
-            <div className="bg-slate-800 text-blue-100 border border-blue-500/30 p-3 rounded-lg">
+            <div className="bg-[#181818] text-[#f1f1f1] border border-[#272727] p-3 rounded-lg">
               <div className="flex items-center gap-2">
                 <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-2 h-2 bg-[#cc0000] rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-[#cc0000] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-[#cc0000] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 </div>
                 <span className="text-sm">Analyzing patterns...</span>
               </div>
@@ -160,20 +160,20 @@ export const TitleChat: React.FC<TitleChatProps> = ({ onTitlesGenerated }) => {
       </div>
 
       {/* Input Form */}
-      <form onSubmit={handleSubmit} className="p-4 border-t border-blue-500/30">
+      <form onSubmit={handleSubmit} className="p-4 border-t border-[#272727]">
         <div className="flex gap-2">
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Paste your video script or describe your content here..."
-            className="flex-1 bg-slate-800/50 border-blue-500/30 text-white placeholder:text-blue-300/50 resize-none"
+            className="flex-1 bg-[#0f0f0f] border-[#272727] text-white placeholder:text-[#666666] resize-none focus:border-[#cc0000]"
             rows={3}
             disabled={isLoading}
           />
           <Button
             type="submit"
             disabled={!input.trim() || isLoading}
-            className="bg-gradient-primary hover:opacity-90 text-white px-4 self-end"
+            className="bg-[#cc0000] hover:bg-[#aa0000] text-white px-4 self-end"
           >
             <Send className="w-4 h-4" />
           </Button>

@@ -170,7 +170,7 @@ const VideoForm = ({ onVideoAdded }: VideoFormProps) => {
         disabled={loading} 
         className="w-full bg-[#cc0000] hover:bg-[#aa0000] text-white"
       >
-        {loading ? 'Adding...' : 'Add Video'}
+        {loading ? 'Adding...' : 'Add Competitor Video'}
       </Button>
     </form>
   );
