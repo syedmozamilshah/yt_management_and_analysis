@@ -98,6 +98,27 @@ const Tools = () => {
     }
   }, [location.search]);
 
+  // Show toast when script/SEO tab is opened with history error
+  useEffect(() => {
+    if (activeTab === 'script' && scriptHistoryError) {
+      toast({
+        title: "Unable to load history",
+        description: "Script history could not be loaded at this time",
+        variant: "destructive",
+      });
+    }
+  }, [activeTab, scriptHistoryError, toast]);
+
+  useEffect(() => {
+    if (activeTab === 'seo' && seoHistoryError) {
+      toast({
+        title: "Unable to load history",
+        description: "SEO history could not be loaded at this time",
+        variant: "destructive",
+      });
+    }
+  }, [activeTab, seoHistoryError, toast]);
+
   useEffect(() => {
     if (user) {
       // Check for cached data first
