@@ -229,6 +229,16 @@ const Tools = () => {
   };
 
   const handleScriptGenerated = async (script: SavedScript) => {
+    // Prevent saving when history is disabled
+    if (scriptHistoryError) {
+      toast({
+        title: "Unable to save",
+        description: "Script history is currently unavailable",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       // Save to Supabase
       const { data, error } = await (supabase as any)
@@ -320,6 +330,16 @@ const Tools = () => {
   };
 
   const handleSeoGenerated = async (seo: SavedSeoDescription) => {
+    // Prevent saving when history is disabled
+    if (seoHistoryError) {
+      toast({
+        title: "Unable to save",
+        description: "SEO history is currently unavailable",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       // Save to Supabase
       const { data, error } = await (supabase as any)
