@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
@@ -10,6 +10,7 @@ import { CompetitorVideosFilter } from '@/components/competitors/CompetitorVideo
 import { CompetitorVideosList } from '@/components/competitors/CompetitorVideosList';
 import { Users, TrendingUp, User, Globe } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface CompetitorChannel {
   id: string;
@@ -33,26 +34,15 @@ interface CompetitorVideo {
 }
 
 const Competitors = () => {
-  const [channels, setChannels] = useState<CompetitorChannel[]>([]);
-  const [videos, setVideos] = useState<CompetitorVideo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [videosLoading, setVideosLoading] = useState(false);
   const [selectedDuration, setSelectedDuration] = useState<string>('30d');
   const { toast } = useToast();
   const { isAdmin, user, shouldQueryAllData, adminDataMode } = useAuth();
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    fetchCompetitorChannels();
-  }, [isAdmin, user?.id, adminDataMode]);
-
-  useEffect(() => {
-    if (channels.length > 0) {
-      fetchCompetitorVideos();
-    }
-  }, [channels, selectedDuration]);
-
-  const fetchCompetitorChannels = async () => {
-    try {
+  // Fetch competitor channels using React Query
+  const { data: channels = [], isLoading: loading } = useQuery({
+    queryKey: ['competitor-channels', user?.id, adminDataMode, shouldQueryAllData()],
+    queryFn: async () => {
       if (shouldQueryAllData()) {
         // Admin in "all-data" mode: fetch ALL users' competitor channels
         const { data, error } = await (supabase as any)
@@ -66,7 +56,7 @@ const Competitors = () => {
         const uniqueChannels = Array.from(
           new Map((data || []).map((ch: CompetitorChannel) => [ch.channel_name, ch])).values()
         );
-        setChannels(uniqueChannels as CompetitorChannel[]);
+        return uniqueChannels as CompetitorChannel[];
       } else if (user?.id) {
         // Regular users OR admin in "my-data" mode: fetch from user_competitor_channels
         const { data, error } = await (supabase as any)
@@ -76,27 +66,19 @@ const Competitors = () => {
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        setChannels(data || []);
-      } else {
-        setChannels([]);
+        return data as CompetitorChannel[] || [];
       }
-    } catch (error) {
-      console.error('Error fetching competitor channels:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load competitor channels",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+      return [];
+    },
+    enabled: !!user?.id || shouldQueryAllData(),
+  });
 
-  const fetchCompetitorVideos = async () => {
-    if (channels.length === 0) return;
-    
-    setVideosLoading(true);
-    try {
+  // Fetch competitor videos using React Query
+  const { data: videos = [], isLoading: videosLoading } = useQuery({
+    queryKey: ['competitor-videos', channels.map(c => c.channel_name), selectedDuration, user?.id, adminDataMode],
+    queryFn: async () => {
+      if (channels.length === 0) return [];
+      
       const channelNames = channels.map(channel => channel.channel_name);
       
       // Calculate date filter (skip for "all" time)
@@ -136,7 +118,7 @@ const Competitors = () => {
         // Combine and sort by view_count
         const allVideos = [...(globalResult.data || []), ...(userResult.data || [])];
         allVideos.sort((a, b) => (b.view_count || 0) - (a.view_count || 0));
-        setVideos(allVideos.slice(0, 50));
+        return allVideos.slice(0, 50) as CompetitorVideo[];
       } else if (user?.id) {
         // Regular users OR admin in "my-data" mode
         let query = (supabase as any)
@@ -154,26 +136,19 @@ const Competitors = () => {
           .limit(50);
 
         if (error) throw error;
-        setVideos(data || []);
+        return data as CompetitorVideo[] || [];
       }
-    } catch (error) {
-      console.error('Error fetching competitor videos:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load competitor videos",
-        variant: "destructive"
-      });
-    } finally {
-      setVideosLoading(false);
-    }
-  };
+      return [];
+    },
+    enabled: channels.length > 0,
+  });
 
   const handleChannelAdded = () => {
-    fetchCompetitorChannels();
+    queryClient.invalidateQueries({ queryKey: ['competitor-channels'] });
   };
 
   const handleChannelDeleted = () => {
-    fetchCompetitorChannels();
+    queryClient.invalidateQueries({ queryKey: ['competitor-channels'] });
   };
 
   return (

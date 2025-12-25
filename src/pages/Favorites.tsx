@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
@@ -9,6 +9,7 @@ import { Heart, Plus, Globe, User } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface Video {
   id: string;
@@ -25,18 +26,14 @@ interface Video {
 }
 
 const Favorites = () => {
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { toast } = useToast();
   const { isAdmin, user, shouldQueryAllData, adminDataMode } = useAuth();
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    fetchFavoriteVideos();
-  }, [isAdmin, user?.id, adminDataMode]);
-
-  const fetchFavoriteVideos = async () => {
-    try {
+  const { data: videos = [], isLoading: loading } = useQuery({
+    queryKey: ['favorite-videos', user?.id, adminDataMode, shouldQueryAllData()],
+    queryFn: async () => {
       if (shouldQueryAllData()) {
         // Admin in "all-data" mode: fetch ALL users' favorites from user_videos
         const { data, error } = await (supabase as any)
@@ -46,7 +43,7 @@ const Favorites = () => {
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        setVideos(data || []);
+        return data as Video[] || [];
       } else if (user?.id) {
         // Regular users OR admin in "my-data" mode: fetch from user_videos
         const { data, error } = await (supabase as any)
@@ -57,24 +54,15 @@ const Favorites = () => {
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        setVideos(data || []);
-      } else {
-        setVideos([]);
+        return data as Video[] || [];
       }
-    } catch (error) {
-      console.error('Error fetching favorite videos:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load favorite videos",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+      return [];
+    },
+    enabled: !!user?.id || shouldQueryAllData(),
+  });
 
   const handleVideoAdded = () => {
-    fetchFavoriteVideos();
+    queryClient.invalidateQueries({ queryKey: ['favorite-videos'] });
     setDialogOpen(false);
   };
 

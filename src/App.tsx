@@ -18,7 +18,22 @@ import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Disable refetch on window focus to prevent loading skeleton flicker
+      refetchOnWindowFocus: false,
+      // Keep data fresh for 5 minutes before considering it stale
+      staleTime: 5 * 60 * 1000,
+      // Keep cached data for 30 minutes
+      gcTime: 30 * 60 * 1000,
+      // Don't refetch on mount if data is still fresh
+      refetchOnMount: false,
+      // Retry failed requests only once
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

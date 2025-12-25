@@ -84,10 +84,15 @@ const Tools = () => {
   const [currentScriptId, setCurrentScriptId] = useState<string>();
   const [currentSeoId, setCurrentSeoId] = useState<string>();
   const [wordUsage, setWordUsage] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  // Check for cached data to determine initial loading state
+  const [isLoading, setIsLoading] = useState(() => {
+    if (user) {
+      const cached = getCache(user.id);
+      return !cached; // Only show loading if no cache
+    }
+    return true;
+  });
   const [showLimitDialog, setShowLimitDialog] = useState(false);
-  const [scriptHistoryError, setScriptHistoryError] = useState(true); // TEMPORARILY DISABLED
-  const [seoHistoryError, setSeoHistoryError] = useState(true); // TEMPORARILY DISABLED
 
   // Handle URL tab parameter
   useEffect(() => {
@@ -98,29 +103,18 @@ const Tools = () => {
     }
   }, [location.search]);
 
-  // Show toast when script/SEO tab is opened with history error
-  useEffect(() => {
-    if (activeTab === 'script' && scriptHistoryError) {
-      toast({
-        title: "Unable to load history",
-        description: "Script history could not be loaded at this time",
-        variant: "destructive",
-      });
-    }
-    if (activeTab === 'seo' && seoHistoryError) {
-      toast({
-        title: "Unable to load history",
-        description: "SEO history could not be loaded at this time",
-        variant: "destructive",
-      });
-    }
-  }, [activeTab, scriptHistoryError, seoHistoryError]);
-
   useEffect(() => {
     if (user) {
-      // TEMPORARILY DISABLED: Skip cache for scripts and SEO
-      // Just load word usage
-      loadData();
+      // Check for cached data first
+      const cached = getCache(user.id);
+      if (cached) {
+        setScripts(cached.scripts);
+        setSeoDescriptions(cached.seoDescriptions);
+        setWordUsage(cached.wordUsage);
+        setIsLoading(false);
+      } else {
+        loadData();
+      }
     }
   }, [user]);
 
@@ -150,17 +144,57 @@ const Tools = () => {
       let loadedScripts: SavedScript[] = [];
       let loadedSeoDescriptions: SavedSeoDescription[] = [];
 
-      // TEMPORARILY DISABLED: Script history loading
-      // Keep scripts array empty and set error flag
-      setScripts([]);
-      setScriptHistoryError(true);
+      // Load scripts from Supabase
+      const { data: scriptsData, error: scriptsError } = await (supabase as any)
+        .from('user_scripts')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
 
-      // TEMPORARILY DISABLED: SEO history loading  
-      // Keep seoDescriptions array empty and set error flag
-      setSeoDescriptions([]);
-      setSeoHistoryError(true);
+      if (scriptsError) {
+        console.error('Error loading scripts:', scriptsError);
+      } else if (scriptsData) {
+        loadedScripts = scriptsData.map((s: any) => ({
+          id: s.id,
+          originalArticle: s.original_article || '',
+          outline: s.outline || '',
+          result: s.result,
+          timestamp: new Date(s.created_at).getTime(),
+          wordCount: s.word_count || 0,
+        }));
+        setScripts(loadedScripts);
+      }
 
-      // Don't cache since history is disabled
+      // Load SEO descriptions from Supabase
+      const { data: seoData, error: seoError } = await (supabase as any)
+        .from('user_seo_descriptions')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (seoError) {
+        console.error('Error loading SEO descriptions:', seoError);
+      } else if (seoData) {
+        loadedSeoDescriptions = seoData.map((s: any) => ({
+          id: s.id,
+          script: s.script,
+          titles: s.titles || [],
+          description: s.description,
+          tags: s.tags,
+          timestamp: new Date(s.created_at).getTime(),
+        }));
+        setSeoDescriptions(loadedSeoDescriptions);
+      }
+
+      // Cache the loaded data
+      if (user) {
+        setCache({
+          scripts: loadedScripts,
+          seoDescriptions: loadedSeoDescriptions,
+          wordUsage: loadedWordUsage,
+          userId: user.id,
+        });
+      }
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -169,20 +203,6 @@ const Tools = () => {
   };
 
   const handleScriptGenerated = async (script: SavedScript) => {
-    // TEMPORARILY DISABLED: Don't save to history
-    if (scriptHistoryError) {
-      // Still update word usage but don't save to history
-      if (script.wordCount) {
-        const updatedUsage = await addWordUsage(script.wordCount);
-        if (updatedUsage) {
-          setWordUsage(updatedUsage.wordUsage);
-        } else {
-          setWordUsage(prev => prev + script.wordCount);
-        }
-      }
-      return;
-    }
-
     try {
       // Save to Supabase
       const { data, error } = await (supabase as any)
@@ -274,11 +294,6 @@ const Tools = () => {
   };
 
   const handleSeoGenerated = async (seo: SavedSeoDescription) => {
-    // TEMPORARILY DISABLED: Don't save to history
-    if (seoHistoryError) {
-      return;
-    }
-
     try {
       // Save to Supabase
       const { data, error } = await (supabase as any)
@@ -544,15 +559,7 @@ const Tools = () => {
                 <SidebarGroupContent>
                   <SidebarMenu>
                     {activeTab === "script" ? (
-                      scriptHistoryError ? (
-                        <div className="px-4 py-6 text-red-500 text-sm">
-                          <div className="flex items-center gap-2">
-                            <AlertCircle className="h-4 w-4" />
-                            <p>History fetch failed</p>
-                          </div>
-                          <p className="text-xs mt-2 text-[#666666]">Unable to load script history</p>
-                        </div>
-                      ) : scripts.length === 0 ? (
+                      scripts.length === 0 ? (
                         <div className="px-4 py-6 text-[#666666] text-sm">
                           <p>No scripts yet</p>
                           <p className="text-xs mt-2">Generate a script to see it here</p>
@@ -602,15 +609,7 @@ const Tools = () => {
                         })
                       )
                     ) : activeTab === "seo" ? (
-                      seoHistoryError ? (
-                        <div className="px-4 py-6 text-red-500 text-sm">
-                          <div className="flex items-center gap-2">
-                            <AlertCircle className="h-4 w-4" />
-                            <p>History fetch failed</p>
-                          </div>
-                          <p className="text-xs mt-2 text-[#666666]">Unable to load SEO history</p>
-                        </div>
-                      ) : seoDescriptions.length === 0 ? (
+                      seoDescriptions.length === 0 ? (
                         <div className="px-4 py-6 text-[#666666] text-sm">
                           <p>No SEO descriptions yet</p>
                           <p className="text-xs mt-2">Generate SEO content to see it here</p>
