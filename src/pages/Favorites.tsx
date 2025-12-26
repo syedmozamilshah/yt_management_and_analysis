@@ -130,17 +130,6 @@ const Favorites = () => {
                     </div>
                   )}
                 </div>
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-[#cc0000] hover:bg-[#aa0000] text-white">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Competitor Video
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="bg-[#181818] border-[#272727] text-[#f1f1f1]">
-                    <AddToFavoritesForm onVideoAdded={handleVideoAdded} />
-                  </DialogContent>
-                </Dialog>
               </div>
             </div>
             
