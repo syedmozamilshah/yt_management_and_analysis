@@ -1,15 +1,26 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import { VideoCard } from './VideoCard';
 import { FilterBar } from './FilterBar';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Video } from '@/types/video';
 import { FilterState, defaultFilters, applyFilters, getUniqueNiches, getViewCountBounds, getSubscriberCountBounds } from '@/utils/filterUtils';
-import { Grid3X3, Sparkles, Plus } from 'lucide-react';
+import { Grid3X3, Sparkles, Plus, Trash2, X, CheckSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface UserVideoGridProps {
   refreshTrigger?: number;
@@ -17,9 +28,16 @@ interface UserVideoGridProps {
 
 export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0 }) => {
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
+  const [selectedVideos, setSelectedVideos] = useState<Set<string>>(new Set());
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch user's personal videos
   const { data: videos = [], isLoading, refetch } = useQuery({
@@ -60,6 +78,8 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
       })) as Video[];
     },
     enabled: !!user?.id,
+    staleTime: 0, // Always consider data stale
+    refetchOnMount: 'always', // Always refetch when component mounts (navigation)
   });
 
   // Update filters when data changes
@@ -86,6 +106,94 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
 
   const handleFavoriteUpdate = () => {
     refetch();
+  };
+
+  // Toggle selection mode
+  const enterSelectionMode = useCallback(() => {
+    setIsSelectionMode(true);
+    setSelectedVideos(new Set());
+  }, []);
+
+  // Handle long press for mobile
+  const handleLongPressStart = useCallback((videoId: string) => {
+    if (!isMobile) return;
+    
+    longPressTimerRef.current = setTimeout(() => {
+      enterSelectionMode();
+      setSelectedVideos(new Set([videoId]));
+    }, 500); // 500ms long press duration
+  }, [isMobile, enterSelectionMode]);
+
+  const handleLongPressEnd = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  // Handle card click in selection mode
+  const handleCardClick = useCallback((videoId: string) => {
+    if (!isSelectionMode) return;
+    
+    setSelectedVideos(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(videoId)) {
+        newSet.delete(videoId);
+      } else {
+        newSet.add(videoId);
+      }
+      return newSet;
+    });
+  }, [isSelectionMode]);
+
+  const toggleVideoSelection = useCallback((videoId: string) => {
+    setSelectedVideos(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(videoId)) {
+        newSet.delete(videoId);
+      } else {
+        newSet.add(videoId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const cancelSelection = useCallback(() => {
+    setIsSelectionMode(false);
+    setSelectedVideos(new Set());
+  }, []);
+
+  const handleDeleteSelected = async () => {
+    if (selectedVideos.size === 0 || !user?.id) return;
+    
+    setIsDeleting(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('user_videos')
+        .delete()
+        .in('id', Array.from(selectedVideos));
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Deleted ${selectedVideos.size} video${selectedVideos.size > 1 ? 's' : ''}`
+      });
+
+      setSelectedVideos(new Set());
+      setIsSelectionMode(false);
+      setShowDeleteDialog(false);
+      queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
+    } catch (error) {
+      console.error('Error deleting videos:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete videos",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   if (isLoading) {
@@ -117,21 +225,23 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
 
   if (videos.length === 0) {
     return (
-      <div className="bg-[#181818] rounded-2xl border border-[#272727] p-12 text-center">
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[#272727] mb-6">
-          <Sparkles className="w-10 h-10 text-[#aaaaaa]" />
+      <div className="space-y-6">
+        <div className="bg-[#181818] rounded-2xl border border-[#272727] p-12 text-center">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[#272727] mb-6">
+            <Sparkles className="w-10 h-10 text-[#aaaaaa]" />
+          </div>
+          <h3 className="text-2xl font-bold text-[#f1f1f1] mb-3">Your Collection is Empty</h3>
+          <p className="text-[#aaaaaa] text-lg mb-6 max-w-md mx-auto">
+            Start building your personal video database. Add YouTube videos to track and analyze.
+          </p>
+          <Button 
+            onClick={() => navigate('/home')}
+            className="bg-[#cc0000] hover:bg-[#aa0000] text-white text-lg px-8 py-3"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Add Your First Video
+          </Button>
         </div>
-        <h3 className="text-2xl font-bold text-[#f1f1f1] mb-3">Your Collection is Empty</h3>
-        <p className="text-[#aaaaaa] text-lg mb-6 max-w-md mx-auto">
-          Start building your personal video database. Add YouTube videos to track and analyze.
-        </p>
-        <Button 
-          onClick={() => navigate('/home')}
-          className="bg-[#cc0000] hover:bg-[#aa0000] text-white text-lg px-8 py-3"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Add Your First Video
-        </Button>
       </div>
     );
   }
@@ -139,14 +249,29 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
   return (
     <div className="space-y-6">
       {/* Filter Section */}
-      <FilterBar
-        filters={filters}
-        onFiltersChange={setFilters}
-        availableNiches={availableNiches}
-        filteredCount={filteredVideos.length}
-        totalCount={videos.length}
-        videos={videos}
-      />
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <FilterBar
+            filters={filters}
+            onFiltersChange={setFilters}
+            availableNiches={availableNiches}
+            filteredCount={filteredVideos.length}
+            totalCount={videos.length}
+            videos={videos}
+          />
+        </div>
+        {!isSelectionMode && !isMobile && filteredVideos.length > 0 && (
+          <Button
+            onClick={enterSelectionMode}
+            variant="ghost"
+            size="sm"
+            className="text-[#888888] hover:text-[#f1f1f1] hover:bg-[#272727] gap-1.5 flex-shrink-0"
+          >
+            <CheckSquare className="w-4 h-4" />
+            Select
+          </Button>
+        )}
+      </div>
       
       {/* Results Section */}
       {filteredVideos.length === 0 ? (
@@ -162,16 +287,103 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredVideos.map((video) => (
-            <VideoCard 
-              key={video.id} 
-              video={video} 
-              onFavoriteUpdate={handleFavoriteUpdate}
-              viewMode="grid"
-              isUserVideo={true}
-            />
+            <div
+              key={video.id}
+              className={`relative ${isSelectionMode ? 'cursor-pointer' : ''}`}
+              onClick={() => handleCardClick(video.id)}
+              onTouchStart={() => handleLongPressStart(video.id)}
+              onTouchEnd={handleLongPressEnd}
+              onMouseDown={() => isMobile ? null : undefined}
+            >
+              {/* Selection Overlay */}
+              {isSelectionMode && (
+                <div 
+                  className={`absolute inset-0 z-10 rounded-xl border-2 transition-all duration-200 pointer-events-none ${
+                    selectedVideos.has(video.id) 
+                      ? 'border-[#cc0000] bg-[#cc0000]/10' 
+                      : 'border-transparent hover:border-[#404040]'
+                  }`}
+                >
+                  {/* Checkbox indicator */}
+                  <div className={`absolute top-2 left-2 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                    selectedVideos.has(video.id)
+                      ? 'bg-[#cc0000] border-[#cc0000]'
+                      : 'bg-black/40 border-white/30'
+                  }`}>
+                    {selectedVideos.has(video.id) && (
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              <div className={isSelectionMode ? 'pointer-events-none' : ''}>
+                <VideoCard 
+                  video={video} 
+                  onFavoriteUpdate={handleFavoriteUpdate}
+                  viewMode="grid"
+                  isUserVideo={true}
+                  blockModalOpen={isSelectionMode}
+                />
+              </div>
+            </div>
           ))}
         </div>
       )}
+
+      {/* Bottom Action Bar - Selection Mode */}
+      {isSelectionMode && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-[#181818] border border-[#272727] rounded-full px-4 py-2 shadow-xl">
+          <Button
+            onClick={cancelSelection}
+            variant="ghost"
+            size="sm"
+            className="text-[#aaaaaa] hover:text-white hover:bg-[#272727] rounded-full h-8 px-3"
+          >
+            <X className="w-4 h-4 mr-1" />
+            Cancel
+          </Button>
+          <span className="text-[#888888] text-sm">
+            {selectedVideos.size} selected
+          </span>
+          <Button
+            onClick={() => setShowDeleteDialog(true)}
+            disabled={selectedVideos.size === 0}
+            size="sm"
+            className="bg-[#cc0000] hover:bg-[#aa0000] text-white rounded-full h-8 px-3"
+          >
+            <Trash2 className="w-4 h-4 mr-1" />
+            Delete
+          </Button>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="bg-[#181818] border-[#272727]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Delete Videos</AlertDialogTitle>
+            <AlertDialogDescription className="text-[#aaaaaa]">
+              Are you sure you want to delete {selectedVideos.size} video{selectedVideos.size > 1 ? 's' : ''}? 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-[#272727] text-white border-[#404040] hover:bg-[#333333]">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSelected}
+              disabled={isDeleting}
+              className="bg-[#cc0000] hover:bg-[#aa0000] text-white"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Youtube, Sparkles, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface CompetitorChannelFormProps {
@@ -85,27 +85,44 @@ export const CompetitorChannelForm: React.FC<CompetitorChannelFormProps> = ({
   };
 
   return (
-    <Card className="bg-[#212121] border-[#272727]">
-      <CardHeader>
-        <CardTitle className="text-[#f1f1f1] flex items-center gap-2">
-          <Plus className="w-5 h-5 text-[#cc0000]" />
-          Add Competitor Channel
+    <Card className="relative overflow-hidden bg-gradient-to-br from-[#181818] to-[#212121] border-[#272727] shadow-2xl">
+      {/* Background glow effect */}
+      <div className="absolute top-0 right-0 w-64 h-64 bg-[#cc0000]/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
+      
+      <CardHeader className="relative">
+        <CardTitle className="text-[#f1f1f1] flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#cc0000] to-[#aa0000] flex items-center justify-center shadow-lg shadow-[#cc0000]/30">
+            <Youtube className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <span className="flex items-center gap-2">
+              Add Competitor Channel
+              <Sparkles className="w-4 h-4 text-[#cc0000]" />
+            </span>
+            <p className="text-sm font-normal text-[#666666] mt-0.5">Analyze any YouTube channel instantly</p>
+          </div>
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="relative">
         <form onSubmit={handleSubmit} className="flex gap-4">
-          <Input
-            type="url"
-            placeholder="Paste YouTube channel URL here..."
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            disabled={loading}
-            className="flex-1 bg-[#181818] border-[#404040] text-[#f1f1f1] placeholder:text-[#aaaaaa] focus:border-[#cc0000]/50"
-          />
+          <div className="relative flex-1">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#555555]">
+              <Youtube className="w-5 h-5" />
+            </div>
+            <Input
+              type="url"
+              placeholder="@channelname or youtube.com/@channel"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              disabled={loading}
+              className="h-12 pl-12 pr-4 bg-[#0f0f0f] border-[#333333] text-[#f1f1f1] placeholder:text-[#555555] focus:border-[#cc0000] focus:ring-2 focus:ring-[#cc0000]/20 rounded-xl transition-all duration-300"
+            />
+          </div>
           <Button 
             type="submit" 
             disabled={loading} 
-            className="bg-[#cc0000] hover:bg-[#aa0000] text-white px-6"
+            className="h-12 bg-gradient-to-r from-[#cc0000] to-[#aa0000] hover:from-[#dd0000] hover:to-[#bb0000] text-white px-6 rounded-xl shadow-lg shadow-[#cc0000]/30 hover:shadow-[#cc0000]/50 transition-all duration-300 group"
           >
             {loading ? (
               <>
@@ -115,7 +132,8 @@ export const CompetitorChannelForm: React.FC<CompetitorChannelFormProps> = ({
             ) : (
               <>
                 <Plus className="w-4 h-4 mr-2" />
-                Add Competitor Channel
+                Add Channel
+                <ArrowRight className="w-4 h-4 ml-1 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
               </>
             )}
           </Button>

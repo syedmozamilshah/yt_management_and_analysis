@@ -15,19 +15,23 @@ interface VideoCardProps {
   onFavoriteUpdate?: () => void;
   viewMode?: 'grid' | 'list';
   isUserVideo?: boolean; // Flag to indicate if this is from user_videos table
+  blockModalOpen?: boolean; // Block modal from opening (for selection mode)
 }
 
 export const VideoCard: React.FC<VideoCardProps> = ({ 
   video, 
   onFavoriteUpdate, 
   viewMode = 'grid',
-  isUserVideo = false
+  isUserVideo = false,
+  blockModalOpen = false
 }) => {
   const { toast } = useToast();
   const { isAdmin } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleClick = () => {
+    // Don't open modal if blocked (selection mode)
+    if (blockModalOpen) return;
     setIsModalOpen(true);
   };
 

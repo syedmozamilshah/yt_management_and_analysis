@@ -6,6 +6,7 @@ import { AllUsersVideoGrid } from '@/components/AllUsersVideoGrid';
 import { TitleGeneratorSection } from '@/components/TitleGeneratorSection';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
+import { AIPromptsSettingsDrawer } from '@/components/AIPromptsSettingsDrawer';
 import { Globe, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -56,23 +57,26 @@ const Index = () => {
             {activeTab === 'videos' && (
               <div className="sticky top-0 z-10 backdrop-blur-xl bg-[#181818] border-b border-[#272727]">
                 <div className="px-4 sm:px-8 py-4">
-                  <div className="flex items-center gap-4">
-                    <SidebarTrigger className="text-[#f1f1f1] hover:bg-[#272727] rounded-xl p-2 transition-all duration-300" />
-                    {isAdmin && (
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#212121] border border-[#272727]">
-                        {shouldQueryAllData() ? (
-                          <>
-                            <Globe className="w-4 h-4 text-[#cc0000]" />
-                            <span className="text-sm text-[#cc0000] font-medium">Viewing All Users Data</span>
-                          </>
-                        ) : (
-                          <>
-                            <User className="w-4 h-4 text-[#aaaaaa]" />
-                            <span className="text-sm text-[#aaaaaa] font-medium">Viewing My Data</span>
-                          </>
-                        )}
-                      </div>
-                    )}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <SidebarTrigger className="text-[#f1f1f1] hover:bg-[#272727] rounded-xl p-2 transition-all duration-300" />
+                      {isAdmin && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#212121] border border-[#272727]">
+                          {shouldQueryAllData() ? (
+                            <>
+                              <Globe className="w-4 h-4 text-[#cc0000]" />
+                              <span className="text-sm text-[#cc0000] font-medium">Viewing All Users Data</span>
+                            </>
+                          ) : (
+                            <>
+                              <User className="w-4 h-4 text-[#aaaaaa]" />
+                              <span className="text-sm text-[#aaaaaa] font-medium">Viewing My Data</span>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <AIPromptsSettingsDrawer />
                   </div>
                 </div>
               </div>

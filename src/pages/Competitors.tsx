@@ -1,239 +1,34 @@
 
-import React, { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import React from 'react';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
-import { CompetitorChannelForm } from '@/components/competitors/CompetitorChannelForm';
-import { CompetitorChannelsList } from '@/components/competitors/CompetitorChannelsList';
-import { CompetitorVideosFilter } from '@/components/competitors/CompetitorVideosFilter';
-import { CompetitorVideosList } from '@/components/competitors/CompetitorVideosList';
-import { Users, TrendingUp, User, Globe } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-
-interface CompetitorChannel {
-  id: string;
-  channel_name: string;
-  channel_id: string;
-  channel_subscribers: number | null;
-  total_videos: number | null;
-  created_at: string;
-}
-
-interface CompetitorVideo {
-  id: string;
-  title: string;
-  youtube_url: string;
-  video_id: string;
-  thumbnail_url: string;
-  channel_name: string;
-  channel_subscribers: number;
-  view_count: number;
-  upload_date: string;
-}
+import { Users2, Sparkles } from 'lucide-react';
+import UserChannelAnalysis from '@/components/home/UserChannelAnalysis';
 
 const Competitors = () => {
-  const [selectedDuration, setSelectedDuration] = useState<string>('30d');
-  const { toast } = useToast();
-  const { isAdmin, user, shouldQueryAllData, adminDataMode } = useAuth();
-  const queryClient = useQueryClient();
-
-  // Fetch competitor channels using React Query
-  const { data: channels = [], isLoading: loading } = useQuery({
-    queryKey: ['competitor-channels', user?.id, adminDataMode, shouldQueryAllData()],
-    queryFn: async () => {
-      if (shouldQueryAllData()) {
-        // Admin in "all-data" mode: fetch ALL users' competitor channels
-        const { data, error } = await (supabase as any)
-          .from('user_competitor_channels')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        // Deduplicate by channel_name (in case multiple users added the same channel)
-        const uniqueChannels = Array.from(
-          new Map((data || []).map((ch: CompetitorChannel) => [ch.channel_name, ch])).values()
-        );
-        return uniqueChannels as CompetitorChannel[];
-      } else if (user?.id) {
-        // Regular users OR admin in "my-data" mode: fetch from user_competitor_channels
-        const { data, error } = await (supabase as any)
-          .from('user_competitor_channels')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        return data as CompetitorChannel[] || [];
-      }
-      return [];
-    },
-    enabled: !!user?.id || shouldQueryAllData(),
-  });
-
-  // Fetch competitor videos using React Query
-  const { data: videos = [], isLoading: videosLoading } = useQuery({
-    queryKey: ['competitor-videos', channels.map(c => c.channel_name), selectedDuration, user?.id, adminDataMode],
-    queryFn: async () => {
-      if (channels.length === 0) return [];
-      
-      const channelNames = channels.map(channel => channel.channel_name);
-      
-      // Calculate date filter (skip for "all" time)
-      const isAllTime = selectedDuration === 'all';
-      let dateFilter: string | null = null;
-      if (!isAllTime) {
-        const now = new Date();
-        const daysAgo = parseInt(selectedDuration.replace('d', ''));
-        dateFilter = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000)).toISOString();
-      }
-
-      if (shouldQueryAllData()) {
-        // Admin in "all-data" mode: fetch from both tables
-        let globalQuery = supabase
-          .from('videos')
-          .select('*')
-          .in('channel_name', channelNames);
-        
-        let userQuery = (supabase as any)
-          .from('user_videos')
-          .select('*')
-          .in('channel_name', channelNames);
-        
-        if (dateFilter) {
-          globalQuery = globalQuery.gte('upload_date', dateFilter);
-          userQuery = userQuery.gte('upload_date', dateFilter);
-        }
-        
-        const [globalResult, userResult] = await Promise.all([
-          globalQuery.order('view_count', { ascending: false }).limit(50),
-          userQuery.order('view_count', { ascending: false }).limit(50)
-        ]);
-
-        if (globalResult.error) throw globalResult.error;
-        if (userResult.error) throw userResult.error;
-
-        // Combine and sort by view_count
-        const allVideos = [...(globalResult.data || []), ...(userResult.data || [])];
-        allVideos.sort((a, b) => (b.view_count || 0) - (a.view_count || 0));
-        return allVideos.slice(0, 50) as CompetitorVideo[];
-      } else if (user?.id) {
-        // Regular users OR admin in "my-data" mode
-        let query = (supabase as any)
-          .from('user_videos')
-          .select('*')
-          .eq('user_id', user.id)
-          .in('channel_name', channelNames);
-        
-        if (dateFilter) {
-          query = query.gte('upload_date', dateFilter);
-        }
-        
-        const { data, error } = await query
-          .order('view_count', { ascending: false })
-          .limit(50);
-
-        if (error) throw error;
-        return data as CompetitorVideo[] || [];
-      }
-      return [];
-    },
-    enabled: channels.length > 0,
-  });
-
-  const handleChannelAdded = () => {
-    queryClient.invalidateQueries({ queryKey: ['competitor-channels'] });
-  };
-
-  const handleChannelDeleted = () => {
-    queryClient.invalidateQueries({ queryKey: ['competitor-channels'] });
-  };
-
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-[#0f0f0f]">
         <AppSidebar />
         <SidebarInset className="flex-1">
           <div className="bg-[#0f0f0f] text-[#f1f1f1] min-h-screen">
-            <div className="sticky top-0 z-10 bg-[#181818] border-b border-[#272727] px-6 py-4">
-              <div className="flex items-center gap-4">
+            <div className="sticky top-0 z-10 bg-[#0f0f0f]/90 backdrop-blur-xl border-b border-[#272727]/50 px-6 py-4">
+              <div className="flex items-center gap-3">
                 <SidebarTrigger className="text-[#f1f1f1] hover:bg-[#272727] rounded-lg transition-all duration-200" />
-                <h1 className="text-xl font-semibold text-[#f1f1f1]">
-                  Competitors Tracker
-                </h1>
-                {isAdmin && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#212121] border border-[#272727]">
-                    {shouldQueryAllData() ? (
-                      <>
-                        <Globe className="w-4 h-4 text-[#cc0000]" />
-                        <span className="text-sm text-[#cc0000] font-medium">All Users</span>
-                      </>
-                    ) : (
-                      <>
-                        <User className="w-4 h-4 text-[#aaaaaa]" />
-                        <span className="text-sm text-[#aaaaaa] font-medium">My Data</span>
-                      </>
-                    )}
-                  </div>
-                )}
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#cc0000] to-[#aa0000] flex items-center justify-center shadow-lg shadow-[#cc0000]/20">
+                  <Users2 className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-semibold text-[#f1f1f1] flex items-center gap-2">
+                    Competitor Analysis
+                    <Sparkles className="w-4 h-4 text-[#cc0000]" />
+                  </h1>
+                </div>
               </div>
             </div>
             
-            <div className="p-6 space-y-8">
-              {/* Header */}
-              <div className="mb-8">
-                <div className="flex items-center gap-3 mb-3">
-                  <Users className="w-8 h-8 text-[#cc0000]" />
-                  <h1 className="text-4xl font-bold text-[#f1f1f1]">
-                    Competitor Analysis
-                  </h1>
-                </div>
-                <p className="text-[#aaaaaa] text-lg">
-                  {shouldQueryAllData() 
-                    ? 'Track and analyze competitors\' most popular videos (All Users Data)'
-                    : 'Track and analyze your personal competitor list'
-                  }
-                </p>
-                {!shouldQueryAllData() && user?.email && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <User className="w-4 h-4 text-[#666666]" />
-                    <span className="text-sm text-[#666666]">{user.email}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Add Channel Form */}
-              <CompetitorChannelForm onChannelAdded={handleChannelAdded} isUserSpecific={!isAdmin} />
-
-              {/* Channels List */}
-              <CompetitorChannelsList 
-                channels={channels} 
-                loading={loading}
-                onChannelDeleted={handleChannelDeleted}
-                isUserSpecific={!isAdmin}
-              />
-
-              {/* Video Filters and Results */}
-              {channels.length > 0 && (
-                <div className="space-y-6">
-                  <div className="flex items-center gap-3">
-                    <TrendingUp className="w-6 h-6 text-[#cc0000]" />
-                    <h2 className="text-2xl font-bold text-[#f1f1f1]">Top Performing Videos</h2>
-                  </div>
-                  
-                  <CompetitorVideosFilter 
-                    selectedDuration={selectedDuration}
-                    onDurationChange={setSelectedDuration}
-                  />
-                  
-                  <CompetitorVideosList 
-                    videos={videos}
-                    loading={videosLoading}
-                  />
-                </div>
-              )}
+            <div className="p-6 max-w-5xl mx-auto">
+              <UserChannelAnalysis />
             </div>
           </div>
         </SidebarInset>

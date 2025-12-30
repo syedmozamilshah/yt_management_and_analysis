@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { channelUrl, daysPeriod = 90 } = await req.json()
+    const { channelUrl, daysPeriod = '90' } = await req.json()
 
     if (!channelUrl) {
       return new Response(
@@ -25,9 +25,10 @@ serve(async (req) => {
       )
     }
 
-    // Validate daysPeriod
+    // Validate daysPeriod - convert to number for validation
     const validPeriods = [7, 28, 90]
-    const selectedPeriod = validPeriods.includes(daysPeriod) ? daysPeriod : 90
+    const periodValue = parseInt(String(daysPeriod), 10)
+    const selectedPeriod = validPeriods.includes(periodValue) ? periodValue : 90
 
     console.log('Fetching all videos from channel:', channelUrl, 'for last', selectedPeriod, 'days')
 
@@ -157,20 +158,37 @@ serve(async (req) => {
 
     console.log(`Looking for videos published after: ${publishedAfter} (last ${selectedPeriod} days)`)
 
-    // Search for recent videos from this channel
-    const videosResponse = await makeYouTubeApiRequest(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&publishedAfter=${publishedAfter}&order=date&type=video&maxResults=50`
-    )
+    // Search for recent videos from this channel with pagination to get all videos
+    let allVideoItems: any[] = []
+    let nextPageToken: string | undefined = undefined
+    let pageCount = 0
+    const maxPages = 10 // Limit to prevent infinite loops (500 videos max)
 
-    if (!videosResponse.ok) {
-      console.error('Videos response not ok:', videosResponse.status)
-      throw new Error(`Failed to fetch channel videos: ${videosResponse.status}`)
-    }
+    do {
+      const pageTokenParam = nextPageToken ? `&pageToken=${nextPageToken}` : ''
+      const videosResponse = await makeYouTubeApiRequest(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&publishedAfter=${publishedAfter}&order=date&type=video&maxResults=50${pageTokenParam}`
+      )
 
-    const videosData = await videosResponse.json()
-    console.log(`Videos found in last ${selectedPeriod} days:`, videosData.items?.length || 0)
+      if (!videosResponse.ok) {
+        console.error('Videos response not ok:', videosResponse.status)
+        throw new Error(`Failed to fetch channel videos: ${videosResponse.status}`)
+      }
+
+      const videosData = await videosResponse.json()
+      console.log(`Page ${pageCount + 1}: Found ${videosData.items?.length || 0} videos`)
+      
+      if (videosData.items && videosData.items.length > 0) {
+        allVideoItems = [...allVideoItems, ...videosData.items]
+      }
+      
+      nextPageToken = videosData.nextPageToken
+      pageCount++
+    } while (nextPageToken && pageCount < maxPages)
+
+    console.log(`Total videos found in last ${selectedPeriod} days:`, allVideoItems.length)
     
-    if (!videosData.items || videosData.items.length === 0) {
+    if (allVideoItems.length === 0) {
       return new Response(
         JSON.stringify({ 
           message: `No videos uploaded in the last ${selectedPeriod} days`,
@@ -185,34 +203,47 @@ serve(async (req) => {
       )
     }
 
-    // Get detailed stats for each video
-    const videoIds = videosData.items.map((item: any) => item.id.videoId).join(',')
-    console.log('Fetching stats for', videosData.items.length, 'videos')
+    // Get detailed stats for each video in batches of 50
+    const allVideos: any[] = []
+    const videoIdBatches: string[][] = []
     
-    const videoStatsResponse = await makeYouTubeApiRequest(
-      `https://www.googleapis.com/youtube/v3/videos?id=${videoIds}&part=snippet,statistics`
-    )
-
-    if (!videoStatsResponse.ok) {
-      console.error('Video stats response not ok:', videoStatsResponse.status)
-      throw new Error(`Failed to fetch video statistics: ${videoStatsResponse.status}`)
+    for (let i = 0; i < allVideoItems.length; i += 50) {
+      const batch = allVideoItems.slice(i, i + 50).map((item: any) => item.id.videoId)
+      videoIdBatches.push(batch)
     }
 
-    const videoStatsData = await videoStatsResponse.json()
-    console.log('Video stats retrieved for', videoStatsData.items?.length || 0, 'videos')
-    
-    // Return ALL videos (not just viral ones)
-    const allVideos = videoStatsData.items.map((video: any) => ({
-      id: video.id,
-      title: video.snippet.title,
-      viewCount: parseInt(video.statistics.viewCount || '0'),
-      uploadDate: video.snippet.publishedAt,
-      thumbnailUrl: video.snippet.thumbnails.maxres?.url || 
-                   video.snippet.thumbnails.high?.url || 
-                   video.snippet.thumbnails.medium?.url ||
-                   video.snippet.thumbnails.default?.url,
-      youtubeUrl: `https://www.youtube.com/watch?v=${video.id}`
-    }))
+    console.log(`Fetching stats for ${allVideoItems.length} videos in ${videoIdBatches.length} batches`)
+
+    for (const batch of videoIdBatches) {
+      const videoIds = batch.join(',')
+      const videoStatsResponse = await makeYouTubeApiRequest(
+        `https://www.googleapis.com/youtube/v3/videos?id=${videoIds}&part=snippet,statistics`
+      )
+
+      if (!videoStatsResponse.ok) {
+        console.error('Video stats response not ok:', videoStatsResponse.status)
+        continue // Skip this batch but continue with others
+      }
+
+      const videoStatsData = await videoStatsResponse.json()
+      
+      if (videoStatsData.items) {
+        const batchVideos = videoStatsData.items.map((video: any) => ({
+          id: video.id,
+          title: video.snippet.title,
+          viewCount: parseInt(video.statistics.viewCount || '0'),
+          uploadDate: video.snippet.publishedAt,
+          thumbnailUrl: video.snippet.thumbnails.maxres?.url || 
+                       video.snippet.thumbnails.high?.url || 
+                       video.snippet.thumbnails.medium?.url ||
+                       video.snippet.thumbnails.default?.url,
+          youtubeUrl: `https://www.youtube.com/watch?v=${video.id}`
+        }))
+        allVideos.push(...batchVideos)
+      }
+    }
+
+    console.log('Returning', allVideos.length, 'videos from channel')
 
     console.log('Returning', allVideos.length, 'videos from channel')
 

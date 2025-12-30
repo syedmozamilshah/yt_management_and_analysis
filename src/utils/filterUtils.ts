@@ -2,6 +2,7 @@ import { Video } from '../types/video';
 
 export interface FilterState {
   viralOnly: boolean;
+  favoritesOnly: boolean;
   selectedNiches: string; // Changed from array to string to match select pattern
   channelSizeRange: string[];
   uploadTiming: string;
@@ -11,6 +12,7 @@ export interface FilterState {
 
 export const defaultFilters: FilterState = {
   viralOnly: false,
+  favoritesOnly: false,
   selectedNiches: 'all', // Changed to string default
   channelSizeRange: [],
   uploadTiming: 'all',
@@ -67,12 +69,8 @@ export const getSubscriberCountBounds = (videos: Video[]): { min: number; max: n
 
 export const uploadTimingOptions = [
   { label: 'All Time', value: 'all' },
-  { label: 'Last 24 Hours', value: '24h' },
-  { label: 'Last 48 Hours', value: '48h' },
   { label: 'Last 7 Days', value: '7d' },
   { label: 'Last 28 Days', value: '28d' },
-  { label: 'Last 30 Days', value: '30d' },
-  { label: 'Last 60 Days', value: '60d' },
   { label: 'Last 90 Days', value: '90d' }
 ];
 
@@ -105,16 +103,11 @@ export const isWithinTimeRange = (uploadDate: string | null, timeRange: string):
   const now = new Date();
   const videoDate = new Date(uploadDate);
   const diffMs = now.getTime() - videoDate.getTime();
-  const diffHours = diffMs / (1000 * 60 * 60);
-  const diffDays = diffHours / 24;
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
   
   switch (timeRange) {
-    case '24h': return diffHours <= 24;
-    case '48h': return diffHours <= 48;
     case '7d': return diffDays <= 7;
     case '28d': return diffDays <= 28;
-    case '30d': return diffDays <= 30;
-    case '60d': return diffDays <= 60;
     case '90d': return diffDays <= 90;
     default: return true;
   }
@@ -122,6 +115,11 @@ export const isWithinTimeRange = (uploadDate: string | null, timeRange: string):
 
 export const applyFilters = (videos: Video[], filters: FilterState): Video[] => {
   return videos.filter(video => {
+    // Favorites filter
+    if (filters.favoritesOnly && !video.is_favorite) {
+      return false;
+    }
+    
     // Viral filter
     if (filters.viralOnly && !isViralVideo(video)) {
       return false;

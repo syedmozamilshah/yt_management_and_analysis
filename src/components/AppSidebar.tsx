@@ -27,12 +27,17 @@ import {
   Tags,
   Users,
   Sparkles,
-  ChevronDown
+  ChevronDown,
+  Plus,
+  Search
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,26 +45,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useState } from "react"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Plus } from "lucide-react"
-import { supabase } from "@/integrations/supabase/client"
-import { useToast } from "@/hooks/use-toast"
 
 export function AppSidebar() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, isAdmin, signOut, adminDataMode, setAdminDataMode } = useAuth()
-  const [showAddCompetitorModal, setShowAddCompetitorModal] = useState(false)
-  const [competitorUrl, setCompetitorUrl] = useState('')
-  const [selectedDuration, setSelectedDuration] = useState('7d')
+  const [addChannelModalOpen, setAddChannelModalOpen] = useState(false)
+  const [channelUrl, setChannelUrl] = useState('')
+  const [daysPeriod, setDaysPeriod] = useState('7')
 
-  const { toast } = useToast()
+  const handleAnalyzeChannel = () => {
+    if (!channelUrl.trim()) return;
+    setAddChannelModalOpen(false);
+    // Navigate to competitors page with the channel URL as a query param
+    navigate(`/competitors?channelUrl=${encodeURIComponent(channelUrl)}&days=${daysPeriod}`);
+    setChannelUrl('');
+    setDaysPeriod('7');
+  }
 
   // Menu items - Reorganized sidebar
   const mainItems = [
@@ -67,17 +69,6 @@ export function AppSidebar() {
       title: "Ideation",
       url: "/",
       icon: Lightbulb,
-    },
-    // Only show Competitor for non-admin users
-    ...(!isAdmin ? [{
-      title: "Competitor",
-      url: "/home",
-      icon: Users,
-    }] : []),
-    {
-      title: "Favorites",
-      url: "/favorites",
-      icon: Heart,
     },
   ]
 
@@ -147,30 +138,7 @@ export function AppSidebar() {
     navigate(url, { replace: true });
   }
 
-  const handleAddCompetitor = async () => {
-    if (!competitorUrl.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a YouTube channel URL",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Navigate directly to channel-analysis section with URL and duration
-    // The UserChannelAnalysis component will handle the actual analysis using get-channel-videos
-    const channelUrlEncoded = encodeURIComponent(competitorUrl);
-    const daysParam = selectedDuration === 'all' ? 'all' : selectedDuration.replace('d', '');
-    
-    setCompetitorUrl('');
-    setSelectedDuration('7d');
-    setShowAddCompetitorModal(false);
-    
-    navigate(`/home?section=channel-analysis&channelUrl=${channelUrlEncoded}&days=${daysParam}`);
-  };
-
   return (
-    <>
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
@@ -181,13 +149,56 @@ export function AppSidebar() {
           {/* Add Competitor Button - Top of sidebar */}
           {!isAdmin && (
             <div className="px-2 mb-3">
-              <Button
-                onClick={() => setShowAddCompetitorModal(true)}
-                className="w-full bg-[#cc0000] hover:bg-[#aa0000] text-white flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Add Competitor
-              </Button>
+              <Dialog open={addChannelModalOpen} onOpenChange={setAddChannelModalOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    className="w-full bg-[#cc0000] hover:bg-[#aa0000] text-white flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Channel
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-[#181818] border border-[#272727] text-white sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="text-white flex items-center gap-2">
+                      <Users className="w-5 h-5 text-[#cc0000]" />
+                      Add Channel
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <Label className="text-[#aaaaaa]">Channel URL or Handle</Label>
+                      <Input
+                        value={channelUrl}
+                        onChange={(e) => setChannelUrl(e.target.value)}
+                        placeholder="@channelname or youtube.com/..."
+                        className="bg-[#0f0f0f] border-[#272727] text-white placeholder:text-[#666666]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[#aaaaaa]">Time Period</Label>
+                      <Select value={daysPeriod} onValueChange={setDaysPeriod}>
+                        <SelectTrigger className="bg-[#0f0f0f] border-[#cc0000] text-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#181818] border-[#272727]">
+                          <SelectItem value="7">Last 7 days</SelectItem>
+                          <SelectItem value="28">Last 28 days</SelectItem>
+                          <SelectItem value="90">Last 90 days</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      onClick={handleAnalyzeChannel}
+                      disabled={!channelUrl.trim()}
+                      className="w-full bg-[#cc0000] hover:bg-[#aa0000] text-white"
+                    >
+                      <Search className="w-4 h-4 mr-2" />
+                      Analyze Channel
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           )}
           <SidebarGroupContent>
@@ -353,56 +364,5 @@ export function AppSidebar() {
         </SidebarFooter>
       )}
     </Sidebar>
-
-    {/* Add Competitor Modal */}
-    <Dialog open={showAddCompetitorModal} onOpenChange={setShowAddCompetitorModal}>
-      <DialogContent className="bg-[#181818] border-[#272727] text-white">
-        <DialogHeader>
-          <DialogTitle className="text-white">Add Competitor Channel</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm text-[#aaaaaa] mb-2 block">YouTube Channel URL</label>
-            <Input
-              type="url"
-              placeholder="Paste YouTube channel URL here... (e.g., https://youtube.com/@channelname)"
-              value={competitorUrl}
-              onChange={(e) => setCompetitorUrl(e.target.value)}
-              className="bg-[#0f0f0f] border-[#272727] text-white placeholder:text-[#666666] focus:border-[#cc0000] focus:ring-1 focus:ring-[#cc0000]"
-            />
-          </div>
-          <div>
-            <label className="text-sm text-[#aaaaaa] mb-2 block">Import Period</label>
-            <select
-              value={selectedDuration}
-              onChange={(e) => setSelectedDuration(e.target.value)}
-              className="w-full bg-[#0f0f0f] border border-[#272727] text-white px-3 py-2 rounded-lg focus:outline-none focus:border-[#cc0000]"
-            >
-              <option value="7d">Last 7 days</option>
-              <option value="14d">Last 14 days</option>
-              <option value="30d">Last 30 days</option>
-              <option value="60d">Last 60 days</option>
-              <option value="90d">Last 90 days</option>
-              <option value="all">All Time</option>
-            </select>
-          </div>
-          <div className="flex gap-2 pt-4">
-            <Button
-              onClick={() => setShowAddCompetitorModal(false)}
-              className="flex-1 bg-[#272727] hover:bg-[#333333] text-white"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleAddCompetitor}
-              className="flex-1 bg-[#cc0000] hover:bg-[#aa0000] text-white"
-            >
-              Add Channel
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-    </>
   )
 }

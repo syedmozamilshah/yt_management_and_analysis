@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Slider } from '@/components/ui/slider';
-import { Filter, Zap, Users, Calendar, RotateCcw, ChevronDown } from 'lucide-react';
+import { Filter, Zap, Users, Calendar, RotateCcw, ChevronDown, Heart } from 'lucide-react';
 import { FilterState, getViewCountBounds, getSubscriberCountBounds } from '@/utils/filterUtils';
 import { Video } from '@/types/video';
 import { formatNumber } from '@/utils/formatNumbers';
@@ -37,6 +37,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     
     return (
       filters.viralOnly ||
+      filters.favoritesOnly ||
       filters.selectedNiches !== 'all' ||
       filters.uploadTiming !== 'all' ||
       filters.viewRange[0] !== viewBounds.min ||
@@ -51,6 +52,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     const subscriberBounds = getSubscriberCountBounds(videos);
     onFiltersChange({
       viralOnly: false,
+      favoritesOnly: false,
       selectedNiches: 'all',
       channelSizeRange: [],
       uploadTiming: 'all',
@@ -106,7 +108,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       </div>
 
       {/* Quick Filters Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {/* Views > Subscribers Filter */}
         <Button
           onClick={() => updateFilter('viralOnly', !filters.viralOnly)}
@@ -119,6 +121,22 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           <Zap className="w-4 h-4 mr-2" />
           Views &gt; Subscribers
           {filters.viralOnly && (
+            <div className="ml-2 w-2 h-2 bg-white rounded-full" />
+          )}
+        </Button>
+
+        {/* Favorites Filter */}
+        <Button
+          onClick={() => updateFilter('favoritesOnly', !filters.favoritesOnly)}
+          className={`h-10 px-4 text-sm font-medium rounded-full transition-all border ${
+            filters.favoritesOnly 
+              ? 'bg-[#cc0000] text-white border-[#cc0000] hover:bg-[#aa0000]' 
+              : 'bg-transparent text-[#f1f1f1] border-[#303030] hover:bg-[#272727] hover:border-[#404040]'
+          }`}
+        >
+          <Heart className="w-4 h-4 mr-2" />
+          Favorites
+          {filters.favoritesOnly && (
             <div className="ml-2 w-2 h-2 bg-white rounded-full" />
           )}
         </Button>
@@ -155,8 +173,6 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             <SelectItem value="all" className="text-[#f1f1f1] hover:bg-[#cc0000] hover:text-white focus:bg-[#cc0000] focus:text-white rounded-lg cursor-pointer">All Time</SelectItem>
             <SelectItem value="7d" className="text-[#f1f1f1] hover:bg-[#cc0000] hover:text-white focus:bg-[#cc0000] focus:text-white rounded-lg cursor-pointer">Last 7 Days</SelectItem>
             <SelectItem value="28d" className="text-[#f1f1f1] hover:bg-[#cc0000] hover:text-white focus:bg-[#cc0000] focus:text-white rounded-lg cursor-pointer">Last 28 Days</SelectItem>
-            <SelectItem value="30d" className="text-[#f1f1f1] hover:bg-[#cc0000] hover:text-white focus:bg-[#cc0000] focus:text-white rounded-lg cursor-pointer">Last 30 Days</SelectItem>
-            <SelectItem value="60d" className="text-[#f1f1f1] hover:bg-[#cc0000] hover:text-white focus:bg-[#cc0000] focus:text-white rounded-lg cursor-pointer">Last 60 Days</SelectItem>
             <SelectItem value="90d" className="text-[#f1f1f1] hover:bg-[#cc0000] hover:text-white focus:bg-[#cc0000] focus:text-white rounded-lg cursor-pointer">Last 90 Days</SelectItem>
           </SelectContent>
         </Select>

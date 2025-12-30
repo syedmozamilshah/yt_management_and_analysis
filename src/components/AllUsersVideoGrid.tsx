@@ -1,12 +1,23 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import { VideoCard } from './VideoCard';
 import { FilterBar } from './FilterBar';
 import { useToast } from '@/hooks/use-toast';
 import { Video } from '@/types/video';
 import { FilterState, defaultFilters, applyFilters, getUniqueNiches, getViewCountBounds, getSubscriberCountBounds } from '@/utils/filterUtils';
-import { Grid3X3, Sparkles, Users } from 'lucide-react';
+import { Grid3X3, Sparkles, Users, Trash2, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface AllUsersVideoGridProps {
   refreshTrigger?: number;
@@ -14,7 +25,14 @@ interface AllUsersVideoGridProps {
 
 export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTrigger = 0 }) => {
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
+  const [selectedVideos, setSelectedVideos] = useState<Set<string>>(new Set());
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const wasLongPressRef = useRef(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Fetch ALL users' videos from user_videos table (admin only)
   const { data: videos = [], isLoading, refetch } = useQuery({
@@ -53,6 +71,8 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
         user_id: uv.user_id, // Keep track of which user added it
       })) as Video[];
     },
+    staleTime: 0, // Always consider data stale
+    refetchOnMount: 'always', // Always refetch when component mounts (navigation)
   });
 
   // Update filters when data changes
@@ -79,6 +99,99 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
 
   const handleFavoriteUpdate = () => {
     refetch();
+  };
+
+  // Long press handlers for multi-select
+  const handleLongPressStart = useCallback((videoId: string, e: React.MouseEvent | React.TouchEvent) => {
+    // Only start long press on left click or touch
+    if ('button' in e && e.button !== 0) return;
+    
+    wasLongPressRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      wasLongPressRef.current = true;
+      setIsSelectionMode(true);
+      setSelectedVideos(new Set([videoId]));
+    }, 500);
+  }, []);
+
+  const handleLongPressEnd = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  // Cancel long press on touch move (prevents accidental selection while scrolling)
+  const handleTouchMove = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const toggleVideoSelection = useCallback((videoId: string) => {
+    if (!isSelectionMode) return;
+    
+    setSelectedVideos(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(videoId)) {
+        newSet.delete(videoId);
+      } else {
+        newSet.add(videoId);
+      }
+      return newSet;
+    });
+  }, [isSelectionMode]);
+
+  // Prevent click from bubbling if it was a long press
+  const handleCardClick = useCallback((videoId: string, e: React.MouseEvent) => {
+    if (wasLongPressRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      wasLongPressRef.current = false;
+      return;
+    }
+    if (isSelectionMode) {
+      toggleVideoSelection(videoId);
+    }
+  }, [isSelectionMode, toggleVideoSelection]);
+
+  const cancelSelection = useCallback(() => {
+    setIsSelectionMode(false);
+    setSelectedVideos(new Set());
+  }, []);
+
+  const handleDeleteSelected = async () => {
+    if (selectedVideos.size === 0) return;
+    
+    setIsDeleting(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('user_videos')
+        .delete()
+        .in('id', Array.from(selectedVideos));
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Deleted ${selectedVideos.size} video${selectedVideos.size > 1 ? 's' : ''}`
+      });
+
+      setSelectedVideos(new Set());
+      setIsSelectionMode(false);
+      setShowDeleteDialog(false);
+      queryClient.invalidateQueries({ queryKey: ['all-users-videos'] });
+    } catch (error) {
+      console.error('Error deleting videos:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete videos",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   if (isLoading) {
@@ -124,6 +237,33 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
 
   return (
     <div className="space-y-6">
+      {/* Selection Mode Bar */}
+      {isSelectionMode && (
+        <div className="sticky top-0 z-20 bg-[#cc0000] rounded-xl p-4 flex items-center justify-between shadow-lg">
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={cancelSelection}
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-white/20"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+            <span className="text-white font-medium">
+              {selectedVideos.size} selected
+            </span>
+          </div>
+          <Button
+            onClick={() => setShowDeleteDialog(true)}
+            disabled={selectedVideos.size === 0}
+            className="bg-white text-[#cc0000] hover:bg-gray-100"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete
+          </Button>
+        </div>
+      )}
+
       {/* Header showing this is all users' data */}
       <div className="flex items-center gap-3 px-4 py-3 bg-[#1a2e1a] border border-green-800/50 rounded-lg">
         <Users className="w-5 h-5 text-green-400" />
@@ -156,16 +296,77 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredVideos.map((video) => (
-            <VideoCard 
-              key={video.id} 
-              video={video} 
-              onFavoriteUpdate={handleFavoriteUpdate}
-              viewMode="grid"
-              isUserVideo={true}
-            />
+            <div
+              key={video.id}
+              className="relative"
+              onMouseDown={(e) => isSelectionMode ? undefined : handleLongPressStart(video.id, e)}
+              onMouseUp={handleLongPressEnd}
+              onMouseLeave={handleLongPressEnd}
+              onTouchStart={(e) => isSelectionMode ? undefined : handleLongPressStart(video.id, e)}
+              onTouchEnd={handleLongPressEnd}
+              onTouchMove={handleTouchMove}
+              onClick={(e) => isSelectionMode ? toggleVideoSelection(video.id) : handleCardClick(video.id, e)}
+            >
+              {/* Selection Overlay */}
+              {isSelectionMode && (
+                <div 
+                  className={`absolute inset-0 z-10 rounded-xl border-2 transition-all duration-200 pointer-events-none ${
+                    selectedVideos.has(video.id) 
+                      ? 'border-[#cc0000] bg-[#cc0000]/20' 
+                      : 'border-transparent'
+                  }`}
+                >
+                  <div className={`absolute top-2 left-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                    selectedVideos.has(video.id)
+                      ? 'bg-[#cc0000] border-[#cc0000]'
+                      : 'bg-black/50 border-white/50'
+                  }`}>
+                    {selectedVideos.has(video.id) && (
+                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              <div className={isSelectionMode ? 'pointer-events-none' : ''}>
+                <VideoCard 
+                  video={video} 
+                  onFavoriteUpdate={handleFavoriteUpdate}
+                  viewMode="grid"
+                  isUserVideo={true}
+                />
+              </div>
+            </div>
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="bg-[#181818] border-[#272727]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Delete Videos</AlertDialogTitle>
+            <AlertDialogDescription className="text-[#aaaaaa]">
+              Are you sure you want to delete {selectedVideos.size} video{selectedVideos.size > 1 ? 's' : ''}? 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-[#272727] text-white border-[#404040] hover:bg-[#333333]">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSelected}
+              disabled={isDeleting}
+              className="bg-[#cc0000] hover:bg-[#aa0000] text-white"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -14,6 +14,14 @@ export default defineConfig(({ mode }) => ({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/scrapingbee/, ''),
         secure: true,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            console.log('Proxying request to:', proxyReq.path);
+          });
+          proxy.on('proxyRes', (proxyRes) => {
+            console.log('Proxy response status:', proxyRes.statusCode);
+          });
+        },
       },
     },
   },
