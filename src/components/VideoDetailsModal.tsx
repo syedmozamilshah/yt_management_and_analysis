@@ -139,7 +139,7 @@ export const VideoDetailsModal: React.FC<VideoDetailsModalProps> = ({
       setIsLoadingTranscript(false);
     }
 
-    openAIWithTranscript(aiTool, currentTranscript);
+    await openAIWithTranscript(aiTool, currentTranscript, toast);
   };
 
   // Check if this is a viral video

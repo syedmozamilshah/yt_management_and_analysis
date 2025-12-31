@@ -279,36 +279,73 @@ export function saveAIPrompts(prompts: Partial<typeof DEFAULT_AI_PROMPTS>): void
 }
 
 /**
- * Open AI tool with prompt and transcript
+ * Get the display name for an AI tool
  */
-export function openAIWithTranscript(
-  aiTool: 'claude' | 'gemini' | 'gpt',
-  transcript: string
-): void {
-  const prompts = getAIPrompts();
-  const fullPrompt = prompts[aiTool] + transcript;
-  
-  // Encode the prompt for URL
-  const encodedPrompt = encodeURIComponent(fullPrompt);
-  
-  let url: string;
-  
+function getAIToolName(aiTool: 'claude' | 'gemini' | 'gpt'): string {
   switch (aiTool) {
     case 'claude':
-      // Claude uses the 'q' parameter for prefilled text
-      url = `https://claude.ai/new?q=${encodedPrompt}`;
-      break;
+      return 'Claude';
     case 'gemini':
-      // Gemini uses the 'prompt' parameter
-      url = `https://gemini.google.com/app?text=${encodedPrompt}`;
-      break;
+      return 'Gemini';
     case 'gpt':
-      // ChatGPT uses different URL structure
-      url = `https://chat.openai.com/?q=${encodedPrompt}`;
-      break;
+      return 'ChatGPT';
     default:
-      return;
+      return 'AI Tool';
   }
+}
+
+/**
+ * Get the URL for an AI tool
+ */
+function getAIToolUrl(aiTool: 'claude' | 'gemini' | 'gpt'): string {
+  switch (aiTool) {
+    case 'claude':
+      return 'https://claude.ai/new';
+    case 'gemini':
+      return 'https://gemini.google.com/app';
+    case 'gpt':
+      return 'https://chat.openai.com/';
+    default:
+      return '';
+  }
+}
+
+/**
+ * Open AI tool with prompt and transcript
+ * Copies the prompt + transcript to clipboard, shows a toast, waits 1.5s, then opens the AI tool
+ */
+export async function openAIWithTranscript(
+  aiTool: 'claude' | 'gemini' | 'gpt',
+  transcript: string,
+  showToast?: (options: { title: string; description: string }) => void
+): Promise<void> {
+  const prompts = getAIPrompts();
+  const fullPrompt = prompts[aiTool] + transcript;
+  const toolName = getAIToolName(aiTool);
+  const url = getAIToolUrl(aiTool);
   
-  window.open(url, '_blank');
+  if (!url) return;
+  
+  try {
+    // Copy prompt + transcript to clipboard
+    await navigator.clipboard.writeText(fullPrompt);
+    
+    // Show toast notification if callback provided
+    if (showToast) {
+      showToast({
+        title: "Copied to Clipboard!",
+        description: `Transcript with Prompt has been copied. Opening ${toolName}... Use Ctrl+V to paste in ${toolName}.`
+      });
+    }
+    
+    // Wait 3 seconds before opening the AI tool (so user can read the toast)
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    // Open the AI tool in a new tab
+    window.open(url, '_blank');
+  } catch (error) {
+    console.error('Failed to copy to clipboard:', error);
+    // Still open the AI tool even if clipboard fails
+    window.open(url, '_blank');
+  }
 }

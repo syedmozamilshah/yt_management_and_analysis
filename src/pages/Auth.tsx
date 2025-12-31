@@ -29,7 +29,7 @@ const Auth = () => {
       if (isAdmin) {
         navigate('/admin/dashboard');
       } else {
-        navigate('/home');
+        navigate('/');
       }
     }
   }, [user, isAdmin, authLoading, navigate]);
@@ -120,7 +120,7 @@ const Auth = () => {
           title: "Welcome! 🎉",
           description: "You're now signed in."
         });
-        navigate('/home');
+        navigate('/');
       }
     } catch (error) {
       toast({
