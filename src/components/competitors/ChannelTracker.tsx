@@ -9,15 +9,13 @@ import {
   Loader2, 
   Youtube, 
   Bell, 
-  BellOff, 
   Trash2, 
   ExternalLink,
   RefreshCw,
   Clock,
   Eye,
   Rss,
-  CheckCircle,
-  XCircle
+  CheckCircle
 } from 'lucide-react';
 import {
   TrackedChannel,
@@ -43,6 +41,7 @@ const ChannelTracker: React.FC = () => {
   const [videos, setVideos] = useState<TrackedVideo[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
 
   // Helper to check if video is new (within 24 hours)
   const isNewVideo = (publishedAt: string): boolean => {
@@ -57,6 +56,11 @@ const ChannelTracker: React.FC = () => {
     const channel = channels.find(c => c.channel_id === channelId);
     return channel?.channel_name || null;
   };
+
+  // Filter videos by selected channel
+  const filteredVideos = selectedChannelId 
+    ? videos.filter(v => v.channel_id === selectedChannelId)
+    : videos;
 
   // Fetch channels and videos on mount
   const fetchData = useCallback(async () => {
@@ -251,7 +255,12 @@ const ChannelTracker: React.FC = () => {
             {channels.map((channel) => (
               <div
                 key={channel.id}
-                className="bg-[#0f0f0f] border border-[#272727] rounded-lg p-4 flex items-center gap-3 group hover:border-[#cc0000]/30 transition-all"
+                onClick={() => setSelectedChannelId(selectedChannelId === channel.channel_id ? null : channel.channel_id)}
+                className={`bg-[#0f0f0f] border rounded-lg p-4 flex items-center gap-3 group hover:border-[#cc0000]/30 transition-all cursor-pointer ${
+                  selectedChannelId === channel.channel_id 
+                    ? 'border-[#cc0000] ring-1 ring-[#cc0000]/50' 
+                    : 'border-[#272727]'
+                }`}
               >
                 {channel.channel_thumbnail ? (
                   <img
@@ -288,7 +297,10 @@ const ChannelTracker: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => handleRemoveChannel(channel)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveChannel(channel);
+                  }}
                   disabled={deletingChannelId === channel.channel_id}
                   className="opacity-0 group-hover:opacity-100 text-[#888888] hover:text-red-500 hover:bg-red-500/10 transition-all disabled:opacity-100"
                 >
@@ -309,7 +321,21 @@ const ChannelTracker: React.FC = () => {
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-white flex items-center gap-2">
             <Youtube className="w-5 h-5 text-[#cc0000]" />
-            Latest Videos
+            {selectedChannelId ? (
+              <>
+                Videos from {getChannelName(selectedChannelId)}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedChannelId(null)}
+                  className="text-xs text-[#888888] hover:text-white ml-2"
+                >
+                  Show All
+                </Button>
+              </>
+            ) : (
+              'Latest Videos'
+            )}
           </h3>
           <div className="flex items-center gap-3">
             {lastRefresh && (
@@ -329,17 +355,20 @@ const ChannelTracker: React.FC = () => {
           </div>
         </div>
 
-        {videos.length === 0 ? (
+        {filteredVideos.length === 0 ? (
           <div className="text-center py-12">
             <Youtube className="w-12 h-12 text-[#272727] mx-auto mb-4" />
             <p className="text-[#888888]">No videos yet</p>
             <p className="text-sm text-[#666666]">
-              Track some channels and new videos will appear here
+              {selectedChannelId 
+                ? 'No videos found for this channel. Try selecting "Show All".'
+                : 'Track some channels and new videos will appear here'
+              }
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {videos.map((video) => (
+            {filteredVideos.map((video) => (
               <div
                 key={video.id}
                 className="bg-[#0f0f0f] border border-[#272727] rounded-lg overflow-hidden group hover:border-[#cc0000]/30 transition-all cursor-pointer"
@@ -364,21 +393,14 @@ const ChannelTracker: React.FC = () => {
                     <ExternalLink className="w-8 h-8 text-white" />
                   </div>
 
-                  {/* Badges */}
-                  <div className="absolute top-2 right-2 flex items-center gap-2">
-                    {isNewVideo(video.published_at) && (
+                  {/* NEW badge only */}
+                  {isNewVideo(video.published_at) && (
+                    <div className="absolute top-2 right-2">
                       <span className="text-xs px-2 py-1 rounded bg-[#cc0000] text-white font-semibold animate-pulse">
                         NEW
                       </span>
-                    )}
-                    <span className={`text-xs px-2 py-1 rounded ${
-                      video.source === 'websub' 
-                        ? 'bg-green-500/20 text-green-400' 
-                        : 'bg-blue-500/20 text-blue-400'
-                    }`}>
-                      {video.source === 'websub' ? 'Live' : 'RSS'}
-                    </span>
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Info */}
