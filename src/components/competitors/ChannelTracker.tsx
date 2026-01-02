@@ -44,6 +44,20 @@ const ChannelTracker: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
+  // Helper to check if video is new (within 24 hours)
+  const isNewVideo = (publishedAt: string): boolean => {
+    const publishedDate = new Date(publishedAt);
+    const now = new Date();
+    const hoursDiff = (now.getTime() - publishedDate.getTime()) / (1000 * 60 * 60);
+    return hoursDiff <= 24;
+  };
+
+  // Helper to get channel name from channel_id
+  const getChannelName = (channelId: string): string | null => {
+    const channel = channels.find(c => c.channel_id === channelId);
+    return channel?.channel_name || null;
+  };
+
   // Fetch channels and videos on mount
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -350,8 +364,13 @@ const ChannelTracker: React.FC = () => {
                     <ExternalLink className="w-8 h-8 text-white" />
                   </div>
 
-                  {/* Source badge */}
-                  <div className="absolute top-2 right-2">
+                  {/* Badges */}
+                  <div className="absolute top-2 right-2 flex items-center gap-2">
+                    {isNewVideo(video.published_at) && (
+                      <span className="text-xs px-2 py-1 rounded bg-[#cc0000] text-white font-semibold animate-pulse">
+                        NEW
+                      </span>
+                    )}
                     <span className={`text-xs px-2 py-1 rounded ${
                       video.source === 'websub' 
                         ? 'bg-green-500/20 text-green-400' 
@@ -367,17 +386,24 @@ const ChannelTracker: React.FC = () => {
                   <h4 className="text-white font-medium line-clamp-2 mb-2 group-hover:text-[#cc0000] transition-colors">
                     {video.title}
                   </h4>
-                  <div className="flex items-center gap-3 text-xs text-[#888888]">
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {formatRelativeTime(video.published_at)}
-                    </span>
-                    {video.view_count && (
-                      <span className="flex items-center gap-1">
-                        <Eye className="w-3 h-3" />
-                        {video.view_count.toLocaleString()}
-                      </span>
+                  <div className="flex flex-col gap-1">
+                    {getChannelName(video.channel_id) && (
+                      <p className="text-xs text-[#aaaaaa] truncate">
+                        {getChannelName(video.channel_id)}
+                      </p>
                     )}
+                    <div className="flex items-center gap-3 text-xs text-[#888888]">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {formatRelativeTime(video.published_at)}
+                      </span>
+                      {video.view_count && (
+                        <span className="flex items-center gap-1">
+                          <Eye className="w-3 h-3" />
+                          {video.view_count.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
