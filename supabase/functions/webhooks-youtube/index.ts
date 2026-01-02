@@ -81,7 +81,7 @@ function parseAtomFeed(xml: string): Array<ReturnType<typeof parseAtomEntry>> {
   return entries
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   const url = new URL(req.url)
   
   // Handle CORS preflight
@@ -262,13 +262,14 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
       })
 
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       console.error('Error processing webhook:', error)
       
       // Log the error
       await supabase.from('webhook_events').insert({
         event_type: 'error',
-        error_message: error.message,
+        error_message: errorMessage,
         processed: false
       })
 

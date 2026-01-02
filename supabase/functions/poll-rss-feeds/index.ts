@@ -75,7 +75,7 @@ interface PollResult {
   error?: string;
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -208,7 +208,8 @@ serve(async (req) => {
         // Small delay between feeds to be nice
         await new Promise(resolve => setTimeout(resolve, 200))
 
-      } catch (error) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         console.error(`Error polling ${channel.channel_id}:`, error)
         results.push({
           channel_id: channel.channel_id,
@@ -216,7 +217,7 @@ serve(async (req) => {
           videos_found: 0,
           videos_inserted: 0,
           success: false,
-          error: error.message
+          error: errorMessage
         })
       }
     }
@@ -234,10 +235,11 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to poll RSS feeds'
     console.error('Error in poll-rss-feeds:', error)
     return new Response(
-      JSON.stringify({ error: error.message || 'Failed to poll RSS feeds' }),
+      JSON.stringify({ error: errorMessage }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

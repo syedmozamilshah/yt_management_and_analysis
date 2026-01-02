@@ -17,7 +17,7 @@ interface ResolveChannelResponse {
   cached: boolean;
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -140,8 +140,9 @@ serve(async (req) => {
         } else {
           console.log('Handle API failed with status:', handleResponse.status)
         }
-      } catch (error) {
-        console.log('Handle API error:', error.message)
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.log('Handle API error:', errorMessage)
       }
       
       // Fallback to search if handle resolution fails
@@ -175,8 +176,9 @@ serve(async (req) => {
               console.log('Found channel ID via search:', channelId)
             }
           }
-        } catch (error) {
-          console.log('Search API error:', error.message)
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+          console.log('Search API error:', errorMessage)
         }
       }
     }
@@ -262,10 +264,11 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to resolve channel ID'
     console.error('Error resolving channel ID:', error)
     return new Response(
-      JSON.stringify({ error: error.message || 'Failed to resolve channel ID' }),
+      JSON.stringify({ error: errorMessage }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

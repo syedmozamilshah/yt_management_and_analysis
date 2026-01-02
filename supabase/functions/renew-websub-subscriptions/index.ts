@@ -16,7 +16,7 @@ interface RenewalResult {
   error?: string;
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -109,14 +109,15 @@ serve(async (req) => {
         // Small delay between requests to be nice to the hub
         await new Promise(resolve => setTimeout(resolve, 100))
 
-      } catch (error) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         console.error(`Error renewing ${channel.channel_id}:`, error)
         failed++
         results.push({
           channel_id: channel.channel_id,
           channel_name: channel.channel_name,
           success: false,
-          error: error.message
+          error: errorMessage
         })
 
         // Log the error
@@ -124,7 +125,7 @@ serve(async (req) => {
           channel_id: channel.channel_id,
           action: 'renew',
           status: 'failed',
-          error_message: error.message
+          error_message: errorMessage
         })
       }
     }
@@ -142,10 +143,11 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to process renewals'
     console.error('Error in renew-websub-subscriptions:', error)
     return new Response(
-      JSON.stringify({ error: error.message || 'Failed to process renewals' }),
+      JSON.stringify({ error: errorMessage }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
