@@ -207,14 +207,51 @@ export async function resubscribeAllChannels(): Promise<{ success: number; faile
 /**
  * Add a new channel and subscribe to webhooks
  */
-export async function addTrackedChannel(channelUrl: string): Promise<ResolveChannelResponse> {
+export async function addTrackedChannel(channelUrl: string, fetchDays: number = 7): Promise<ResolveChannelResponse & { videos_fetched?: number }> {
   // First resolve the channel
   const channelData = await resolveChannelId(channelUrl);
   
   // Then subscribe to webhooks
   await subscribeToWebhook(channelData.channel_id);
   
-  return channelData;
+  // Fetch historical videos if requested
+  let videosFetched = 0;
+  if (fetchDays > 0) {
+    try {
+      const fetchResult = await fetchChannelVideos(channelData.channel_id, fetchDays);
+      videosFetched = fetchResult.videos_inserted;
+    } catch (error) {
+      console.warn('Failed to fetch historical videos:', error);
+      // Don't fail the whole operation if historical fetch fails
+    }
+  }
+  
+  return {
+    ...channelData,
+    videos_fetched: videosFetched
+  };
+}
+
+/**
+ * Fetch historical videos for a channel
+ */
+export async function fetchChannelVideos(channelId: string, days: number = 7): Promise<{ videos_inserted: number; videos_found: number }> {
+  const { data, error } = await supabase.functions.invoke('fetch-channel-videos', {
+    body: { channel_id: channelId, days }
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to fetch channel videos');
+  }
+
+  if (data.error) {
+    throw new Error(data.error);
+  }
+
+  return {
+    videos_inserted: data.videos_inserted || 0,
+    videos_found: data.videos_found || 0
+  };
 }
 
 /**

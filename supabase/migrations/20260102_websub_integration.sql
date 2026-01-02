@@ -6,10 +6,7 @@
 -- ============================================
 -- 1. User Activity Tracking
 -- ============================================
--- Add last_route_opened_at to track user activity
-ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS last_competitor_route_opened_at TIMESTAMP WITH TIME ZONE;
-
--- Create a separate user_activity table for tracking (since we can't easily modify auth.users)
+-- Create a separate user_activity table for tracking user activity
 CREATE TABLE IF NOT EXISTS public.user_activity (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,

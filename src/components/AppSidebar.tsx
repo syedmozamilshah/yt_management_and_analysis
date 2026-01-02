@@ -71,11 +71,6 @@ export function AppSidebar() {
       url: "/",
       icon: Lightbulb,
     },
-    {
-      title: "Channel Tracker",
-      url: "/channel-tracker",
-      icon: Rss,
-    },
   ]
 
   // AI Tools items
@@ -99,6 +94,11 @@ export function AppSidebar() {
       title: "Competitor",
       url: "/tools?tab=competitor",
       icon: Users,
+    },
+    {
+      title: "Channel Tracker",
+      url: "/channel-tracker",
+      icon: Rss,
     }
   ]
 

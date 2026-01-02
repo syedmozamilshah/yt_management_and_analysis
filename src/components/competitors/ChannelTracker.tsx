@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
@@ -34,8 +35,10 @@ const ChannelTracker: React.FC = () => {
   const { toast } = useToast();
   
   const [channelUrl, setChannelUrl] = useState('');
+  const [fetchDays, setFetchDays] = useState<string>('7');
   const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingChannelId, setDeletingChannelId] = useState<string | null>(null);
   const [channels, setChannels] = useState<TrackedChannel[]>([]);
   const [videos, setVideos] = useState<TrackedVideo[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -100,14 +103,15 @@ const ChannelTracker: React.FC = () => {
     setIsAdding(true);
 
     try {
-      const result = await addTrackedChannel(channelUrl);
+      const result = await addTrackedChannel(channelUrl, parseInt(fetchDays));
       
       toast({
         title: '✅ Channel Added!',
-        description: `Now tracking ${result.channel_name}. You'll be notified of new uploads.`
+        description: `Now tracking ${result.channel_name}. ${result.videos_fetched ? `Fetched ${result.videos_fetched} recent videos.` : "You'll be notified of new uploads."}`
       });
 
       setChannelUrl('');
+      setFetchDays('7');
       fetchData();
     } catch (error: any) {
       console.error('Error adding channel:', error);
@@ -122,6 +126,7 @@ const ChannelTracker: React.FC = () => {
   };
 
   const handleRemoveChannel = async (channel: TrackedChannel) => {
+    setDeletingChannelId(channel.channel_id);
     try {
       await removeTrackedChannel(channel.channel_id);
       
@@ -138,6 +143,8 @@ const ChannelTracker: React.FC = () => {
         description: 'Failed to remove channel',
         variant: 'destructive'
       });
+    } finally {
+      setDeletingChannelId(null);
     }
   };
 
@@ -174,25 +181,42 @@ const ChannelTracker: React.FC = () => {
           </div>
         </div>
 
-        <form onSubmit={handleAddChannel} className="flex gap-3">
-          <Input
-            value={channelUrl}
-            onChange={(e) => setChannelUrl(e.target.value)}
-            placeholder="@channelname or youtube.com/channel/..."
-            className="flex-1 bg-[#0f0f0f] border-[#272727] text-white placeholder:text-[#666666]"
-            disabled={isAdding}
-          />
+        <form onSubmit={handleAddChannel} className="space-y-4">
+          <div className="flex gap-3">
+            <Input
+              value={channelUrl}
+              onChange={(e) => setChannelUrl(e.target.value)}
+              placeholder="@channelname or youtube.com/channel/..."
+              className="flex-1 bg-[#0f0f0f] border-[#272727] text-white placeholder:text-[#666666]"
+              disabled={isAdding}
+            />
+            <Select value={fetchDays} onValueChange={setFetchDays} disabled={isAdding}>
+              <SelectTrigger className="w-[140px] bg-[#0f0f0f] border-[#272727] text-white">
+                <SelectValue placeholder="Fetch videos" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#181818] border-[#272727]">
+                <SelectItem value="0" className="text-white hover:bg-[#272727]">No history</SelectItem>
+                <SelectItem value="7" className="text-white hover:bg-[#272727]">Last 7 days</SelectItem>
+                <SelectItem value="28" className="text-white hover:bg-[#272727]">Last 28 days</SelectItem>
+                <SelectItem value="90" className="text-white hover:bg-[#272727]">Last 90 days</SelectItem>
+                <SelectItem value="180" className="text-white hover:bg-[#272727]">Last 6 months</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Button
             type="submit"
             disabled={isAdding || !channelUrl.trim()}
-            className="bg-[#cc0000] hover:bg-[#aa0000] text-white"
+            className="w-full bg-[#cc0000] hover:bg-[#aa0000] text-white"
           >
             {isAdding ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Adding Channel...
+              </>
             ) : (
               <>
                 <Rss className="w-4 h-4 mr-2" />
-                Track
+                Track Channel
               </>
             )}
           </Button>
@@ -251,9 +275,14 @@ const ChannelTracker: React.FC = () => {
                   variant="ghost"
                   size="icon"
                   onClick={() => handleRemoveChannel(channel)}
-                  className="opacity-0 group-hover:opacity-100 text-[#888888] hover:text-red-500 hover:bg-red-500/10 transition-all"
+                  disabled={deletingChannelId === channel.channel_id}
+                  className="opacity-0 group-hover:opacity-100 text-[#888888] hover:text-red-500 hover:bg-red-500/10 transition-all disabled:opacity-100"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  {deletingChannelId === channel.channel_id ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-red-500" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
                 </Button>
               </div>
             ))}
