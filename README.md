@@ -2,6 +2,8 @@
 
 A comprehensive YouTube content management and analysis platform built with React, TypeScript, and Supabase. This tool helps content creators manage their video library, analyze competitors, generate SEO-optimized content, and create AI-powered scripts.
 
+**Last Updated**: January 2, 2026
+
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
 ![React](https://img.shields.io/badge/React-20232A?style=flat&logo=react&logoColor=61DAFB)
 ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat&logo=vite&logoColor=white)
@@ -278,6 +280,14 @@ This project is private and proprietary.
 ## 🆘 Support
 
 For support, please contact the repository owner or open an issue in the GitHub repository.
+
+## 📝 Changelog
+
+### Recent Updates (v1.2.0)
+- Enhanced AI tool integration with clipboard functionality
+- Improved UX with toast notifications for tool actions
+- Added support for transcript copying to clipboard
+- Performance optimizations in video grid rendering
 
 ---
 
