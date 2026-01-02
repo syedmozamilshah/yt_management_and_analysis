@@ -47,10 +47,19 @@ A comprehensive YouTube content management and analysis platform built with Reac
 - **Multiple Title Variants**: Generate various title options
 - **Click-worthy Titles**: Optimized for engagement and CTR
 
+### � Competitor Tracking
+- **Real-time WebSub**: Instant notifications when competitors upload videos
+- **Channel Subscription**: Subscribe to any YouTube channel via @handle or direct URL
+- **Video Auto-discovery**: New videos automatically saved to database
+- **Fallback Polling**: RSS polling every 12 hours as backup mechanism
+- **Subscription Management**: Automatic renewal for active users
+- **Activity-based Pausing**: Inactive users don't consume webhook resources
+
 ### 👤 User Management
 - **Authentication**: Secure user authentication via Supabase
 - **User-specific Data**: Each user has their own video library and data
 - **Admin Dashboard**: Admin-only features for managing all users' data
+- **Activity Tracking**: Monitors user access to competitor tracker route
 
 ### 📈 Admin Features
 - **Admin Dashboard**: Overview of platform usage and statistics
@@ -116,13 +125,70 @@ A comprehensive YouTube content management and analysis platform built with Reac
 │   │   ├── get-channel-viewboard-stats/
 │   │   ├── get-fresh-channel-stats/
 │   │   ├── get-youtube-video/
+│   │   ├── poll-rss-feeds/              # RSS polling (12h fallback)
 │   │   ├── refresh-viewboard-cache/
+│   │   ├── renew-websub-subscriptions/ # Subscription renewal (daily)
+│   │   ├── resolve-channel-id/         # Channel URL resolution
+│   │   ├── subscribe-youtube-webhook/  # WebSub subscription
 │   │   ├── tool-usage/
 │   │   ├── update-all-channels/
-│   │   └── update-competitor-channels/
+│   │   ├── update-competitor-channels/
+│   │   └── webhooks-youtube/           # Real-time webhook endpoint
 │   └── migrations/          # Database migrations
 └── package.json
 ```
+
+## 🔔 WebSub (Real-time Competitor Tracking)
+
+The platform includes a **WebSub (PubSubHubbub)** system for real-time YouTube video notifications.
+
+### Architecture Overview
+
+```
+┌─ User adds channel ──→ resolve-channel-id ──→ Extract channel_id
+└──→ Generate RSS URL ──→ subscribe-youtube-webhook ──→ Register with Hub
+
+┌─ YouTube Hub ──→ Detects new video ──→ POST /webhooks/youtube
+└──→ Parse Atom XML ──→ Save to DB ──→ Frontend notified (real-time)
+
+┌─ Daily renewal job ──→ Check active users ──→ Renew expiring subscriptions
+└──→ Inactive users skip (save resources)
+
+┌─ 12h polling fallback ──→ Fetch RSS feeds ──→ Detect new videos
+└──→ Avoid duplicates (check by video_id)
+```
+
+### Key Features
+
+- **Real-time Delivery**: WebSub hub POSTs videos instantly
+- **Automatic Renewal**: Daily job renews subscriptions before expiration
+- **Activity-based Pausing**: Inactive users (72h+) don't renew subscriptions
+- **Fallback Mechanism**: RSS polling every 12 hours ensures no missed videos
+- **Efficient**: Event-driven design, no unnecessary polling
+- **Reliable**: Both WebSub and RSS polling ensure redundancy
+
+### Database Schema
+
+```sql
+-- Extended competitor channels table
+user_competitor_channels.rss_feed_url: TEXT
+user_competitor_channels.webhook_subscribed: BOOLEAN
+user_competitor_channels.subscription_expires_at: TIMESTAMP
+user_competitor_channels.subscription_status: 'active'|'pending'|'failed'|'inactive'
+
+-- New tables for video storage and subscription tracking
+user_competitor_videos (channel_id, video_id, published_at, source, ...)
+websub_subscriptions (channel_id, subscription_expires_at, renewal_status, ...)
+auth.users.last_competitor_route_opened: TIMESTAMP
+```
+
+### Monitoring
+
+Check the Competitor Tracker page for:
+- ✅ **Active**: Subscription is working
+- ⏳ **Pending**: Waiting for webhook verification
+- ❌ **Failed**: Subscription failed, manual renewal needed
+- ⭕ **Inactive**: User not active, paused to save resources
 
 ## 🚀 Getting Started
 
