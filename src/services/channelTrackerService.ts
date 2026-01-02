@@ -214,11 +214,11 @@ export async function addTrackedChannel(channelUrl: string, fetchDays: number = 
   // Then subscribe to webhooks
   await subscribeToWebhook(channelData.channel_id);
   
-  // Fetch historical videos if requested
+  // Fetch historical videos if requested (using RSS - NO QUOTA COST!)
   let videosFetched = 0;
   if (fetchDays > 0) {
     try {
-      const fetchResult = await fetchChannelVideos(channelData.channel_id, fetchDays);
+      const fetchResult = await fetchChannelVideos(channelData.channel_id, channelData.rss_feed_url, fetchDays);
       videosFetched = fetchResult.videos_inserted;
     } catch (error) {
       console.warn('Failed to fetch historical videos:', error);
@@ -233,11 +233,11 @@ export async function addTrackedChannel(channelUrl: string, fetchDays: number = 
 }
 
 /**
- * Fetch historical videos for a channel
+ * Fetch historical videos for a channel using RSS (NO quota cost!)
  */
-export async function fetchChannelVideos(channelId: string, days: number = 7): Promise<{ videos_inserted: number; videos_found: number }> {
+export async function fetchChannelVideos(channelId: string, rssFeedUrl: string, days: number = 7): Promise<{ videos_inserted: number; videos_found: number }> {
   const { data, error } = await supabase.functions.invoke('fetch-channel-videos', {
-    body: { channel_id: channelId, days }
+    body: { channel_id: channelId, rss_feed_url: rssFeedUrl, days }
   });
 
   if (error) {

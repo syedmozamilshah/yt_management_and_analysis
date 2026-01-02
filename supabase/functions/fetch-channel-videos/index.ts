@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { makeYouTubeApiRequest } from "../_shared/youtube-api-keys.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,17 +17,77 @@ interface VideoItem {
   view_count: number | null;
 }
 
+// Simple XML parser for Atom feeds
+function parseAtomEntry(xml: string): {
+  videoId: string | null;
+  channelId: string | null;
+  title: string | null;
+  publishedAt: string | null;
+  link: string | null;
+} {
+  const result = {
+    videoId: null as string | null,
+    channelId: null as string | null,
+    title: null as string | null,
+    publishedAt: null as string | null,
+    link: null as string | null,
+  }
+
+  const videoIdMatch = xml.match(/<yt:videoId>([^<]+)<\/yt:videoId>/i)
+  if (videoIdMatch) {
+    result.videoId = videoIdMatch[1].trim()
+  }
+
+  const channelIdMatch = xml.match(/<yt:channelId>([^<]+)<\/yt:channelId>/i)
+  if (channelIdMatch) {
+    result.channelId = channelIdMatch[1].trim()
+  }
+
+  const titleMatch = xml.match(/<title>([^<]+)<\/title>/i)
+  if (titleMatch) {
+    result.title = titleMatch[1].trim()
+  }
+
+  const publishedMatch = xml.match(/<published>([^<]+)<\/published>/i)
+  if (publishedMatch) {
+    result.publishedAt = publishedMatch[1].trim()
+  }
+
+  const linkMatch = xml.match(/<link[^>]*href="([^"]+)"[^>]*>/i)
+  if (linkMatch) {
+    result.link = linkMatch[1].trim()
+  }
+
+  return result
+}
+
+function parseAtomFeed(xml: string): Array<ReturnType<typeof parseAtomEntry>> {
+  const entries: Array<ReturnType<typeof parseAtomEntry>> = []
+  
+  const entryRegex = /<entry>([\s\S]*?)<\/entry>/gi
+  let match
+  
+  while ((match = entryRegex.exec(xml)) !== null) {
+    const entry = parseAtomEntry(match[1])
+    if (entry.videoId && entry.channelId) {
+      entries.push(entry)
+    }
+  }
+  
+  return entries
+}
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { channel_id, days } = await req.json()
+    const { channel_id, rss_feed_url, days } = await req.json()
 
-    if (!channel_id) {
+    if (!channel_id || !rss_feed_url) {
       return new Response(
-        JSON.stringify({ error: 'Channel ID is required' }),
+        JSON.stringify({ error: 'Channel ID and RSS feed URL are required' }),
         { 
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -37,7 +96,7 @@ serve(async (req: Request) => {
     }
 
     const fetchDays = days || 7
-    console.log(`Fetching videos for channel ${channel_id} from last ${fetchDays} days`)
+    console.log(`Fetching videos for channel ${channel_id} from RSS (last ${fetchDays} days)`)
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -73,80 +132,58 @@ serve(async (req: Request) => {
     // Calculate the date threshold
     const dateThreshold = new Date()
     dateThreshold.setDate(dateThreshold.getDate() - fetchDays)
-    const publishedAfter = dateThreshold.toISOString()
 
-    console.log(`Fetching videos published after: ${publishedAfter}`)
+    console.log(`Fetching videos from RSS published after: ${dateThreshold.toISOString()}`)
 
-    // Use YouTube Data API to search for videos from this channel
-    let allVideos: VideoItem[] = []
-    let nextPageToken: string | null = null
-    let pageCount = 0
-    const maxPages = 5 // Limit to prevent excessive API calls
-
-    do {
-      let apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channel_id}&type=video&order=date&maxResults=50&publishedAfter=${encodeURIComponent(publishedAfter)}`
-      
-      if (nextPageToken) {
-        apiUrl += `&pageToken=${nextPageToken}`
+    // Fetch the RSS feed (NO QUOTA USAGE!)
+    const feedResponse = await fetch(rss_feed_url, {
+      headers: {
+        'User-Agent': 'Video-Stash-Gallery/1.0 (Historical Fetch)'
       }
+    })
 
-      const searchResponse = await makeYouTubeApiRequest(apiUrl)
-      
-      if (!searchResponse.ok) {
-        console.error('YouTube search API error:', searchResponse.status)
-        break
-      }
-
-      const searchData = await searchResponse.json()
-      
-      if (searchData.items && searchData.items.length > 0) {
-        // Get video IDs for detailed stats
-        const videoIds = searchData.items.map((item: any) => item.id.videoId).join(',')
-        
-        // Fetch video details for view counts
-        const detailsResponse = await makeYouTubeApiRequest(
-          `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}`
-        )
-        
-        let videoDetails: Record<string, any> = {}
-        if (detailsResponse.ok) {
-          const detailsData = await detailsResponse.json()
-          for (const item of detailsData.items || []) {
-            videoDetails[item.id] = item
-          }
+    if (!feedResponse.ok) {
+      return new Response(
+        JSON.stringify({ error: `Failed to fetch RSS feed: HTTP ${feedResponse.status}` }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
+      )
+    }
 
-        for (const item of searchData.items) {
-          const videoId = item.id.videoId
-          const details = videoDetails[videoId]
-          const snippet = details?.snippet || item.snippet
-          
-          const video: VideoItem = {
-            video_id: videoId,
-            channel_id: channel_id,
-            title: snippet.title,
-            description: snippet.description?.substring(0, 500) || null,
-            thumbnail_url: snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-            published_at: snippet.publishedAt,
-            youtube_url: `https://www.youtube.com/watch?v=${videoId}`,
-            view_count: details?.statistics?.viewCount ? parseInt(details.statistics.viewCount) : null
-          }
-          
-          allVideos.push(video)
-        }
+    const feedXml = await feedResponse.text()
+    const entries = parseAtomFeed(feedXml)
+
+    console.log(`Parsed ${entries.length} entries from RSS feed`)
+
+    // Filter by date and build video items
+    const allVideos: VideoItem[] = []
+    
+    for (const entry of entries) {
+      if (!entry.videoId || !entry.channelId || !entry.publishedAt) continue
+
+      const publishedDate = new Date(entry.publishedAt)
+      if (publishedDate < dateThreshold) {
+        // Skip videos older than the requested period
+        continue
       }
 
-      nextPageToken = searchData.nextPageToken || null
-      pageCount++
+      const video: VideoItem = {
+        video_id: entry.videoId,
+        channel_id: entry.channelId,
+        title: entry.title || 'Untitled',
+        description: null,
+        thumbnail_url: `https://i.ytimg.com/vi/${entry.videoId}/hqdefault.jpg`,
+        published_at: entry.publishedAt,
+        youtube_url: entry.link || `https://www.youtube.com/watch?v=${entry.videoId}`,
+        view_count: null // RSS doesn't provide view counts, we'll leave as null
+      }
       
-      // Small delay between pages
-      if (nextPageToken) {
-        await new Promise(resolve => setTimeout(resolve, 100))
-      }
+      allVideos.push(video)
+    }
 
-    } while (nextPageToken && pageCount < maxPages)
-
-    console.log(`Found ${allVideos.length} videos from YouTube API`)
+    console.log(`Found ${allVideos.length} videos within ${fetchDays} day period`)
 
     // Insert videos into tracked_videos, skipping duplicates
     let insertedCount = 0
@@ -193,7 +230,8 @@ serve(async (req: Request) => {
         days: fetchDays,
         videos_found: allVideos.length,
         videos_inserted: insertedCount,
-        videos_skipped: skippedCount
+        videos_skipped: skippedCount,
+        quota_cost: 0
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
