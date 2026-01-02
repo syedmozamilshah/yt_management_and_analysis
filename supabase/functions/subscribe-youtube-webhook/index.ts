@@ -1,152 +1,156 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { corsHeaders } from "../_shared/cors.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const webhookBaseUrl = Deno.env.get("WEBHOOK_BASE_URL") || "https://yt-management-and-analysis.vercel.app";
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-const HUB_URL = "https://pubsubhubbub.appspot.com/";
-const HUB_LEASE_SECONDS = 432000; // 5 days
+const WEBSUB_HUB_URL = 'https://pubsubhubbub.appspot.com/subscribe'
+const WEBHOOK_CALLBACK_URL = 'https://baffhoalkllpeugluyon.supabase.co/functions/v1/webhooks-youtube'
 
-/**
- * Subscribe to YouTube WebSub hub for real-time video notifications
- */
-async function subscribeToWebSub(
-  channelId: string,
-  userId: string
-): Promise<{ success: boolean; error?: string; expiresAt?: string }> {
-  try {
-    const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
-    const callbackUrl = `${webhookBaseUrl}/api/webhooks/youtube`;
+interface SubscribeRequest {
+  channel_id: string;
+  mode?: 'subscribe' | 'unsubscribe';
+}
 
-    const formData = new URLSearchParams();
-    formData.append("hub.mode", "subscribe");
-    formData.append("hub.topic", rssUrl);
-    formData.append("hub.callback", callbackUrl);
-    formData.append("hub.verify", "async");
-    formData.append("hub.lease_seconds", HUB_LEASE_SECONDS.toString());
-
-    console.log(`Subscribing to channel ${channelId} for user ${userId}`);
-
-    const response = await fetch(HUB_URL, {
-      method: "POST",
-      body: formData.toString(),
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`WebSub subscription failed: ${response.status} - ${errorText}`);
-      return {
-        success: false,
-        error: `WebSub hub returned ${response.status}`,
-      };
-    }
-
-    // Calculate expiration time (now + lease seconds)
-    const expiresAt = new Date(Date.now() + HUB_LEASE_SECONDS * 1000).toISOString();
-
-    // Save subscription details
-    const { error: saveError } = await supabase
-      .from("websub_subscriptions")
-      .upsert(
-        {
-          user_id: userId,
-          channel_id: channelId,
-          subscription_expires_at: expiresAt,
-          renewal_status: "pending",
-          last_renewal_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id,channel_id" }
-      );
-
-    if (saveError) {
-      console.error("Error saving subscription:", saveError);
-      return {
-        success: false,
-        error: saveError.message,
-      };
-    }
-
-    // Update channel with webhook subscription status
-    const { error: updateError } = await supabase
-      .from("user_competitor_channels")
-      .update({
-        webhook_subscribed: true,
-        subscription_expires_at: expiresAt,
-        subscription_status: "pending",
-        rss_feed_url: rssUrl,
-      })
-      .eq("user_id", userId)
-      .eq("channel_id", channelId);
-
-    if (updateError) {
-      console.error("Error updating channel:", updateError);
-      return {
-        success: false,
-        error: updateError.message,
-      };
-    }
-
-    console.log(`Successfully initiated WebSub subscription for channel ${channelId}`);
-
-    return {
-      success: true,
-      expiresAt,
-    };
-  } catch (error) {
-    console.error("Error in subscribeToWebSub:", error);
-    return {
-      success: false,
-      error: error.message,
-    };
-  }
+interface SubscribeResponse {
+  success: boolean;
+  channel_id: string;
+  mode: string;
+  message: string;
+  hub_response?: string;
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { channel_id, user_id } = await req.json();
+    const { channel_id, mode = 'subscribe' }: SubscribeRequest = await req.json()
 
-    if (!channel_id || !user_id) {
+    if (!channel_id) {
       return new Response(
-        JSON.stringify({ error: "channel_id and user_id are required" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+        JSON.stringify({ error: 'channel_id is required' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
-    const result = await subscribeToWebSub(channel_id, user_id);
+    console.log(`WebSub ${mode} request for channel:`, channel_id)
 
-    if (!result.success) {
-      return new Response(JSON.stringify(result), {
-        status: 400,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Get the user from the authorization header (optional for cron jobs)
+    const authHeader = req.headers.get('Authorization')
+    let userId: string | null = null
+    
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '')
+      const { data: { user } } = await supabase.auth.getUser(token)
+      userId = user?.id || null
     }
 
-    return new Response(
-      JSON.stringify({
-        status: "success",
-        message: "WebSub subscription initiated",
-        expiresAt: result.expiresAt,
-      }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
-    );
+    // Build the topic URL (RSS feed URL)
+    const topicUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channel_id}`
+
+    // Prepare the WebSub subscription request
+    const formData = new URLSearchParams({
+      'hub.mode': mode,
+      'hub.topic': topicUrl,
+      'hub.callback': WEBHOOK_CALLBACK_URL,
+      'hub.verify': 'async'
+    })
+
+    console.log('Sending WebSub request to hub:', WEBSUB_HUB_URL)
+    console.log('Form data:', formData.toString())
+
+    // Send the subscription request to Google's PubSubHubbub hub
+    const hubResponse = await fetch(WEBSUB_HUB_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: formData.toString()
+    })
+
+    const hubResponseText = await hubResponse.text()
+    console.log('Hub response status:', hubResponse.status)
+    console.log('Hub response:', hubResponseText)
+
+    // Log the subscription attempt
+    await supabase.from('websub_subscription_logs').insert({
+      channel_id,
+      action: mode,
+      status: hubResponse.ok ? 'pending' : 'failed',
+      hub_response: `Status: ${hubResponse.status}, Body: ${hubResponseText}`
+    })
+
+    if (!hubResponse.ok) {
+      console.error('WebSub hub returned error:', hubResponse.status, hubResponseText)
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          channel_id,
+          mode,
+          message: `WebSub hub returned status ${hubResponse.status}`,
+          hub_response: hubResponseText
+        }),
+        { 
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    // For async verification, the hub returns 202 Accepted
+    // The actual verification happens when the hub calls our webhook with hub.challenge
+    
+    if (mode === 'subscribe') {
+      // Set pending subscription status
+      // subscription_expires_at will be set when we receive the verification callback
+      await supabase
+        .from('tracked_channels')
+        .update({
+          webhook_subscribed: false, // Will be true after verification
+          updated_at: new Date().toISOString()
+        })
+        .eq('channel_id', channel_id)
+
+      console.log(`Subscription request sent for channel ${channel_id}, awaiting verification`)
+    } else if (mode === 'unsubscribe') {
+      console.log(`Unsubscription request sent for channel ${channel_id}`)
+    }
+
+    const response: SubscribeResponse = {
+      success: true,
+      channel_id,
+      mode,
+      message: mode === 'subscribe' 
+        ? 'Subscription request sent. Awaiting hub verification.'
+        : 'Unsubscription request sent.',
+      hub_response: `Status: ${hubResponse.status}`
+    }
+
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+
   } catch (error) {
-    console.error("Error:", error);
+    console.error('Error in subscribe-youtube-webhook:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+      JSON.stringify({ error: error.message || 'Failed to process subscription request' }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
   }
-});
+})

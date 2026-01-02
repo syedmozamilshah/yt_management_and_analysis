@@ -1,0 +1,241 @@
+import { supabase } from '@/integrations/supabase/client';
+
+export interface TrackedChannel {
+  id: string;
+  channel_id: string;
+  channel_name: string | null;
+  channel_handle: string | null;
+  channel_thumbnail: string | null;
+  channel_subscribers: number | null;
+  rss_feed_url: string | null;
+  webhook_subscribed: boolean;
+  subscription_expires_at: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface TrackedVideo {
+  id: string;
+  video_id: string;
+  channel_id: string;
+  title: string;
+  description: string | null;
+  thumbnail_url: string | null;
+  published_at: string;
+  youtube_url: string | null;
+  view_count: number | null;
+  source: string;
+  created_at: string;
+}
+
+export interface ResolveChannelResponse {
+  channel_id: string;
+  channel_name: string;
+  channel_handle: string | null;
+  channel_thumbnail: string | null;
+  channel_subscribers: number;
+  rss_feed_url: string;
+  cached: boolean;
+}
+
+/**
+ * Resolve a channel URL to get channel details and save to tracked_channels
+ */
+export async function resolveChannelId(channelUrl: string): Promise<ResolveChannelResponse> {
+  const { data, error } = await supabase.functions.invoke('resolve-channel-id', {
+    body: { channelUrl }
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to resolve channel');
+  }
+
+  if (data.error) {
+    throw new Error(data.error);
+  }
+
+  return data;
+}
+
+/**
+ * Subscribe a channel to YouTube WebSub notifications
+ */
+export async function subscribeToWebhook(channelId: string): Promise<{ success: boolean; message: string }> {
+  const { data, error } = await supabase.functions.invoke('subscribe-youtube-webhook', {
+    body: { channel_id: channelId, mode: 'subscribe' }
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to subscribe to webhook');
+  }
+
+  return data;
+}
+
+/**
+ * Unsubscribe a channel from YouTube WebSub notifications
+ */
+export async function unsubscribeFromWebhook(channelId: string): Promise<{ success: boolean; message: string }> {
+  const { data, error } = await supabase.functions.invoke('subscribe-youtube-webhook', {
+    body: { channel_id: channelId, mode: 'unsubscribe' }
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to unsubscribe from webhook');
+  }
+
+  return data;
+}
+
+/**
+ * Get all tracked channels for the current user
+ */
+export async function getTrackedChannels(): Promise<TrackedChannel[]> {
+  const { data, error } = await supabase
+    .from('tracked_channels')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to fetch tracked channels');
+  }
+
+  return data || [];
+}
+
+/**
+ * Remove a tracked channel
+ */
+export async function removeTrackedChannel(channelId: string): Promise<void> {
+  // First unsubscribe from webhook
+  try {
+    await unsubscribeFromWebhook(channelId);
+  } catch (e) {
+    console.warn('Failed to unsubscribe from webhook:', e);
+  }
+
+  const { error } = await supabase
+    .from('tracked_channels')
+    .delete()
+    .eq('channel_id', channelId);
+
+  if (error) {
+    throw new Error(error.message || 'Failed to remove channel');
+  }
+}
+
+/**
+ * Get videos from tracked channels
+ */
+export async function getTrackedVideos(limit = 50): Promise<TrackedVideo[]> {
+  const { data, error } = await supabase
+    .from('tracked_videos')
+    .select('*')
+    .order('published_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(error.message || 'Failed to fetch tracked videos');
+  }
+
+  return data || [];
+}
+
+/**
+ * Get videos for a specific channel
+ */
+export async function getChannelVideos(channelId: string, limit = 20): Promise<TrackedVideo[]> {
+  const { data, error } = await supabase
+    .from('tracked_videos')
+    .select('*')
+    .eq('channel_id', channelId)
+    .order('published_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(error.message || 'Failed to fetch channel videos');
+  }
+
+  return data || [];
+}
+
+/**
+ * Update user activity - call this when user opens the competitor tracker route
+ */
+export async function updateUserActivity(): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) return;
+
+  const { error } = await supabase
+    .from('user_activity')
+    .upsert({
+      user_id: user.id,
+      last_competitor_route_opened_at: new Date().toISOString(),
+      is_active: true,
+      updated_at: new Date().toISOString()
+    }, {
+      onConflict: 'user_id'
+    });
+
+  if (error) {
+    console.error('Failed to update user activity:', error);
+  }
+}
+
+/**
+ * Re-subscribe all user's channels (when user becomes active again after 72 hours)
+ */
+export async function resubscribeAllChannels(): Promise<{ success: number; failed: number }> {
+  const channels = await getTrackedChannels();
+  let success = 0;
+  let failed = 0;
+
+  for (const channel of channels) {
+    try {
+      await subscribeToWebhook(channel.channel_id);
+      success++;
+    } catch (e) {
+      console.error(`Failed to resubscribe ${channel.channel_id}:`, e);
+      failed++;
+    }
+  }
+
+  return { success, failed };
+}
+
+/**
+ * Add a new channel and subscribe to webhooks
+ */
+export async function addTrackedChannel(channelUrl: string): Promise<ResolveChannelResponse> {
+  // First resolve the channel
+  const channelData = await resolveChannelId(channelUrl);
+  
+  // Then subscribe to webhooks
+  await subscribeToWebhook(channelData.channel_id);
+  
+  return channelData;
+}
+
+/**
+ * Format relative time (e.g., "2 hours ago")
+ */
+export function formatRelativeTime(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffDays > 0) {
+    return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
+  } else if (diffHours > 0) {
+    return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
+  } else if (diffMins > 0) {
+    return diffMins === 1 ? '1 minute ago' : `${diffMins} minutes ago`;
+  } else {
+    return 'Just now';
+  }
+}

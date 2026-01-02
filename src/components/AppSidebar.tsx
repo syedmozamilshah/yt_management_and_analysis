@@ -29,7 +29,8 @@ import {
   Sparkles,
   ChevronDown,
   Plus,
-  Search
+  Search,
+  Rss
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { Button } from "@/components/ui/button"
@@ -69,6 +70,11 @@ export function AppSidebar() {
       title: "Ideation",
       url: "/",
       icon: Lightbulb,
+    },
+    {
+      title: "Channel Tracker",
+      url: "/channel-tracker",
+      icon: Rss,
     },
   ]
 

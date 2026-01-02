@@ -604,6 +604,198 @@ export type Database = {
         }
         Relationships: []
       }
+      tracked_channels: {
+        Row: {
+          id: string
+          user_id: string
+          channel_id: string
+          channel_name: string | null
+          channel_handle: string | null
+          channel_thumbnail: string | null
+          channel_subscribers: number | null
+          rss_feed_url: string | null
+          webhook_subscribed: boolean
+          subscription_expires_at: string | null
+          last_webhook_received_at: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          channel_id: string
+          channel_name?: string | null
+          channel_handle?: string | null
+          channel_thumbnail?: string | null
+          channel_subscribers?: number | null
+          rss_feed_url?: string | null
+          webhook_subscribed?: boolean
+          subscription_expires_at?: string | null
+          last_webhook_received_at?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          channel_id?: string
+          channel_name?: string | null
+          channel_handle?: string | null
+          channel_thumbnail?: string | null
+          channel_subscribers?: number | null
+          rss_feed_url?: string | null
+          webhook_subscribed?: boolean
+          subscription_expires_at?: string | null
+          last_webhook_received_at?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tracked_videos: {
+        Row: {
+          id: string
+          video_id: string
+          channel_id: string
+          title: string
+          description: string | null
+          thumbnail_url: string | null
+          published_at: string
+          youtube_url: string | null
+          view_count: number | null
+          like_count: number | null
+          comment_count: number | null
+          source: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          video_id: string
+          channel_id: string
+          title: string
+          description?: string | null
+          thumbnail_url?: string | null
+          published_at: string
+          youtube_url?: string | null
+          view_count?: number | null
+          like_count?: number | null
+          comment_count?: number | null
+          source?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          video_id?: string
+          channel_id?: string
+          title?: string
+          description?: string | null
+          thumbnail_url?: string | null
+          published_at?: string
+          youtube_url?: string | null
+          view_count?: number | null
+          like_count?: number | null
+          comment_count?: number | null
+          source?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_activity: {
+        Row: {
+          id: string
+          user_id: string
+          last_competitor_route_opened_at: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          last_competitor_route_opened_at?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          last_competitor_route_opened_at?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      websub_subscription_logs: {
+        Row: {
+          id: string
+          channel_id: string
+          action: string
+          status: string
+          hub_response: string | null
+          error_message: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          channel_id: string
+          action: string
+          status: string
+          hub_response?: string | null
+          error_message?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          channel_id?: string
+          action?: string
+          status?: string
+          hub_response?: string | null
+          error_message?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      webhook_events: {
+        Row: {
+          id: string
+          event_type: string
+          channel_id: string | null
+          video_id: string | null
+          payload: string | null
+          processed: boolean
+          error_message: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          event_type: string
+          channel_id?: string | null
+          video_id?: string | null
+          payload?: string | null
+          processed?: boolean
+          error_message?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          event_type?: string
+          channel_id?: string | null
+          video_id?: string | null
+          payload?: string | null
+          processed?: boolean
+          error_message?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -622,6 +814,31 @@ export type Database = {
       subtract_word_usage: { 
         Args: { p_user_id: string; p_word_count: number }
         Returns: { word_usage: number; max_words: number; month: string }[]
+      }
+      is_user_active: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
+      get_channels_needing_renewal: {
+        Args: Record<string, never>
+        Returns: {
+          id: string
+          user_id: string
+          channel_id: string
+          channel_name: string | null
+          rss_feed_url: string | null
+          subscription_expires_at: string | null
+        }[]
+      }
+      get_channels_for_rss_poll: {
+        Args: Record<string, never>
+        Returns: {
+          id: string
+          user_id: string
+          channel_id: string
+          channel_name: string | null
+          rss_feed_url: string | null
+        }[]
       }
     }
     Enums: {

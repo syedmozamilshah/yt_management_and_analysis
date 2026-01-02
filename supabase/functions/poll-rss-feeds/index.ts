@@ -1,202 +1,247 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-const ACTIVE_USER_THRESHOLD = 72; // hours
-
-/**
- * Parse YouTube Atom XML feed and extract video information
- */
-function parseAtomFeed(xml: string): { video_id: string; title: string; published_at: string }[] {
-  const videos: { video_id: string; title: string; published_at: string }[] = [];
-
-  try {
-    const entryRegex = /<entry>[\s\S]*?<\/entry>/g;
-    const entries = xml.match(entryRegex) || [];
-
-    for (const entry of entries) {
-      const videoIdMatch = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
-      const titleMatch = entry.match(/<title>([^<]+)<\/title>/);
-      const publishedMatch = entry.match(/<published>([^<]+)<\/published>/);
-
-      if (videoIdMatch && titleMatch && publishedMatch) {
-        videos.push({
-          video_id: videoIdMatch[1],
-          title: titleMatch[1],
-          published_at: publishedMatch[1],
-        });
-      }
-    }
-  } catch (error) {
-    console.error("Error parsing RSS feed:", error);
-  }
-
-  return videos;
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-/**
- * Fetch and parse RSS feed for a channel
- */
-async function fetchRssFeed(rssUrl: string): Promise<{ video_id: string; title: string; published_at: string }[]> {
-  try {
-    const response = await fetch(rssUrl, {
-      method: "GET",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; YouTubeBot/1.0)",
-      },
-    });
-
-    if (!response.ok) {
-      console.error(`Failed to fetch RSS feed: ${response.status}`);
-      return [];
-    }
-
-    const xml = await response.text();
-    return parseAtomFeed(xml);
-  } catch (error) {
-    console.error("Error fetching RSS feed:", error);
-    return [];
+// Simple XML parser for Atom feeds
+function parseAtomEntry(xml: string): {
+  videoId: string | null;
+  channelId: string | null;
+  title: string | null;
+  publishedAt: string | null;
+  link: string | null;
+} {
+  const result = {
+    videoId: null as string | null,
+    channelId: null as string | null,
+    title: null as string | null,
+    publishedAt: null as string | null,
+    link: null as string | null,
   }
+
+  const videoIdMatch = xml.match(/<yt:videoId>([^<]+)<\/yt:videoId>/i)
+  if (videoIdMatch) {
+    result.videoId = videoIdMatch[1].trim()
+  }
+
+  const channelIdMatch = xml.match(/<yt:channelId>([^<]+)<\/yt:channelId>/i)
+  if (channelIdMatch) {
+    result.channelId = channelIdMatch[1].trim()
+  }
+
+  const titleMatch = xml.match(/<title>([^<]+)<\/title>/i)
+  if (titleMatch) {
+    result.title = titleMatch[1].trim()
+  }
+
+  const publishedMatch = xml.match(/<published>([^<]+)<\/published>/i)
+  if (publishedMatch) {
+    result.publishedAt = publishedMatch[1].trim()
+  }
+
+  const linkMatch = xml.match(/<link[^>]*href="([^"]+)"[^>]*>/i)
+  if (linkMatch) {
+    result.link = linkMatch[1].trim()
+  }
+
+  return result
 }
 
-/**
- * Check if user is active (visited competitor tracker within threshold)
- */
-async function isUserActive(userId: string): Promise<boolean> {
-  try {
-    const { data: user, error } = await supabase
-      .from("users")
-      .select("last_competitor_route_opened")
-      .eq("id", userId)
-      .single();
-
-    if (error) {
-      console.warn("Error fetching user:", error);
-      return false;
+function parseAtomFeed(xml: string): Array<ReturnType<typeof parseAtomEntry>> {
+  const entries: Array<ReturnType<typeof parseAtomEntry>> = []
+  
+  const entryRegex = /<entry>([\s\S]*?)<\/entry>/gi
+  let match
+  
+  while ((match = entryRegex.exec(xml)) !== null) {
+    const entry = parseAtomEntry(match[1])
+    if (entry.videoId && entry.channelId) {
+      entries.push(entry)
     }
-
-    if (!user?.last_competitor_route_opened) {
-      return false;
-    }
-
-    const lastOpenedTime = new Date(user.last_competitor_route_opened);
-    const hoursSinceLastOpen = (Date.now() - lastOpenedTime.getTime()) / (1000 * 60 * 60);
-
-    return hoursSinceLastOpen < ACTIVE_USER_THRESHOLD;
-  } catch (error) {
-    console.error("Error checking user activity:", error);
-    return false;
   }
+  
+  return entries
 }
 
-/**
- * Poll RSS feeds for active users and detect new videos
- */
-async function pollRssFeeds() {
-  try {
-    console.log("Starting RSS feed polling for fallback mechanism");
-
-    // Get all unique channels with RSS URLs for active users
-    const { data: channels, error: fetchError } = await supabase
-      .from("user_competitor_channels")
-      .select("id, user_id, channel_id, rss_feed_url")
-      .not("rss_feed_url", "is", null)
-      .eq("webhook_subscribed", true); // Only poll channels with WebSub
-
-    if (fetchError) {
-      console.error("Error fetching channels:", fetchError);
-      return;
-    }
-
-    if (!channels || channels.length === 0) {
-      console.log("No channels to poll");
-      return;
-    }
-
-    console.log(`Found ${channels.length} channels to poll`);
-
-    let pollsAttempted = 0;
-    let videosFound = 0;
-    let videosSaved = 0;
-    let skippedInactiveUsers = 0;
-
-    // Group channels by user to minimize API calls
-    const channelsByUser = new Map<string, typeof channels>();
-    for (const channel of channels) {
-      const userId = channel.user_id;
-      if (!channelsByUser.has(userId)) {
-        channelsByUser.set(userId, []);
-      }
-      channelsByUser.get(userId)!.push(channel);
-    }
-
-    for (const [userId, userChannels] of channelsByUser) {
-      // Check if user is active
-      const active = await isUserActive(userId);
-
-      if (!active) {
-        console.log(`Skipping user ${userId} - inactive`);
-        skippedInactiveUsers += userChannels.length;
-        continue;
-      }
-
-      for (const channel of userChannels) {
-        if (!channel.rss_feed_url) continue;
-
-        try {
-          console.log(`Polling RSS feed for channel ${channel.channel_id}`);
-          const videos = await fetchRssFeed(channel.rss_feed_url);
-          pollsAttempted++;
-          videosFound += videos.length;
-
-          // Check and save new videos
-          for (const video of videos) {
-            const { error: insertError } = await supabase
-              .from("user_competitor_videos")
-              .insert({
-                user_id: userId,
-                channel_id: channel.channel_id,
-                video_id: video.video_id,
-                title: video.title,
-                published_at: video.published_at,
-                source: "rss_polling",
-              });
-
-            if (insertError) {
-              if (insertError.code !== "23505") {
-                // Not a duplicate error
-                console.error(`Error inserting video: ${insertError.message}`);
-              }
-            } else {
-              videosSaved++;
-            }
-          }
-        } catch (error) {
-          console.error(`Error polling channel ${channel.channel_id}:`, error);
-        }
-      }
-    }
-
-    console.log(
-      `RSS polling complete - Polls: ${pollsAttempted}, Videos found: ${videosFound}, Saved: ${videosSaved}, Skipped users: ${skippedInactiveUsers}`
-    );
-  } catch (error) {
-    console.error("Error in RSS polling job:", error);
-  }
+interface PollResult {
+  channel_id: string;
+  channel_name: string | null;
+  videos_found: number;
+  videos_inserted: number;
+  success: boolean;
+  error?: string;
 }
 
 serve(async (req) => {
-  // Trigger job via cron or manual request
-  if (req.method === "POST" || req.method === "GET") {
-    await pollRssFeeds();
-    return new Response(JSON.stringify({ status: "success" }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
   }
 
-  return new Response("Method not allowed", { status: 405 });
-});
+  try {
+    console.log('Starting RSS polling fallback job...')
+
+    // Initialize Supabase client with service role
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Get channels for RSS polling (active users only)
+    const { data: channelsToPoll, error: fetchError } = await supabase
+      .rpc('get_channels_for_rss_poll')
+
+    if (fetchError) {
+      console.error('Error fetching channels for polling:', fetchError)
+      throw fetchError
+    }
+
+    console.log(`Found ${channelsToPoll?.length || 0} channels to poll`)
+
+    if (!channelsToPoll || channelsToPoll.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'No channels to poll',
+          polled: 0,
+          total_videos_inserted: 0
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const results: PollResult[] = []
+    let polled = 0
+    let totalVideosInserted = 0
+
+    for (const channel of channelsToPoll) {
+      try {
+        if (!channel.rss_feed_url) {
+          console.log(`Skipping channel ${channel.channel_id}: no RSS feed URL`)
+          continue
+        }
+
+        console.log(`Polling RSS feed for channel: ${channel.channel_id} (${channel.channel_name})`)
+
+        // Fetch the RSS feed
+        const feedResponse = await fetch(channel.rss_feed_url, {
+          headers: {
+            'User-Agent': 'Video-Stash-Gallery/1.0 (RSS Polling)'
+          }
+        })
+
+        if (!feedResponse.ok) {
+          console.error(`Failed to fetch RSS for ${channel.channel_id}: ${feedResponse.status}`)
+          results.push({
+            channel_id: channel.channel_id,
+            channel_name: channel.channel_name,
+            videos_found: 0,
+            videos_inserted: 0,
+            success: false,
+            error: `HTTP ${feedResponse.status}`
+          })
+          continue
+        }
+
+        const feedXml = await feedResponse.text()
+        const entries = parseAtomFeed(feedXml)
+
+        console.log(`Found ${entries.length} entries in RSS feed for ${channel.channel_id}`)
+
+        let videosInserted = 0
+
+        for (const entry of entries) {
+          if (!entry.videoId || !entry.channelId) continue
+
+          // Check if video already exists
+          const { data: existingVideo } = await supabase
+            .from('tracked_videos')
+            .select('id')
+            .eq('video_id', entry.videoId)
+            .single()
+
+          if (existingVideo) {
+            // Video already exists, skip
+            continue
+          }
+
+          const youtubeUrl = entry.link || `https://www.youtube.com/watch?v=${entry.videoId}`
+          const thumbnailUrl = `https://i.ytimg.com/vi/${entry.videoId}/hqdefault.jpg`
+
+          // Insert new video
+          const { error: insertError } = await supabase
+            .from('tracked_videos')
+            .insert({
+              video_id: entry.videoId,
+              channel_id: entry.channelId,
+              title: entry.title || 'Untitled',
+              thumbnail_url: thumbnailUrl,
+              youtube_url: youtubeUrl,
+              published_at: entry.publishedAt || new Date().toISOString(),
+              source: 'rss_poll'
+            })
+
+          if (insertError) {
+            if (insertError.code === '23505') {
+              // Duplicate, skip
+              continue
+            }
+            console.error('Error inserting video:', insertError)
+          } else {
+            videosInserted++
+            console.log(`Inserted video from RSS: ${entry.videoId}`)
+          }
+        }
+
+        polled++
+        totalVideosInserted += videosInserted
+
+        results.push({
+          channel_id: channel.channel_id,
+          channel_name: channel.channel_name,
+          videos_found: entries.length,
+          videos_inserted: videosInserted,
+          success: true
+        })
+
+        // Small delay between feeds to be nice
+        await new Promise(resolve => setTimeout(resolve, 200))
+
+      } catch (error) {
+        console.error(`Error polling ${channel.channel_id}:`, error)
+        results.push({
+          channel_id: channel.channel_id,
+          channel_name: channel.channel_name,
+          videos_found: 0,
+          videos_inserted: 0,
+          success: false,
+          error: error.message
+        })
+      }
+    }
+
+    console.log(`RSS polling job completed. Polled: ${polled}, Videos inserted: ${totalVideosInserted}`)
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: `Polled ${polled} channels`,
+        polled,
+        total_videos_inserted: totalVideosInserted,
+        results
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+
+  } catch (error) {
+    console.error('Error in poll-rss-feeds:', error)
+    return new Response(
+      JSON.stringify({ error: error.message || 'Failed to poll RSS feeds' }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
+  }
+})
