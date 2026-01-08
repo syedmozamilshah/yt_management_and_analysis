@@ -1,7 +1,9 @@
 # YouTube Data API Quota Optimization Report
 
 ## Summary
-**Reduced quota consumption by ~98%** for historical video fetching by replacing expensive YouTube API search calls with RSS feed parsing.
+**Reduced quota consumption by ~99%** by replacing expensive YouTube API calls with RSS feeds, HTML scraping, and WebSub webhooks.
+
+**Latest Update (January 2026):** Added quota-free channel resolution using HTML scraping instead of YouTube Data API.
 
 ---
 
@@ -29,6 +31,15 @@
 
 ## After Optimization (New Implementation)
 
+### `resolve-channel-id` - Now Uses HTML Scraping (NEW!)
+| Operation | Method | Quota Cost | Speed |
+|-----------|--------|-----------|-------|
+| Handle → Channel ID | HTML Scraping | **0 units** ✅ | ~500ms |
+| Validate channel | RSS Feed | **0 units** ✅ | ~300ms |
+| Get channel details | HTML parsing | **0 units** ✅ | Included |
+| YouTube API fallback | channels.list | 1-102 | Only if scraping fails |
+| **Total (typical)** | - | **0 units** ✅ | ~800ms total |
+
 ### `fetch-channel-videos` - Now Uses RSS
 | Operation | Source | Quota Cost | Speed |
 |-----------|--------|-----------|-------|
@@ -39,25 +50,30 @@
 
 ### Quota Savings
 ```
-BEFORE: 510 quota per historical fetch
-AFTER:  0 quota per historical fetch
-SAVED:  510 quota × 100% = 98% reduction
+CHANNEL RESOLUTION:
+  BEFORE: 2-102 quota per channel
+  AFTER:  0 quota (scraping) with API fallback
+  SAVED:  ~99% reduction
+
+VIDEO FETCHING:  
+  BEFORE: 510 quota per historical fetch
+  AFTER:  0 quota per historical fetch
+  SAVED:  100% reduction
 ```
 
 **Example: Adding 100 channels with history**
-- Old: 51,000 quota (5.1 days of quota) ❌
+- Old: 51,000+ quota (5+ days of quota) ❌
 - New: 0 quota ✅ (unlimited!)
 
 ---
 
-## Remaining Quota Usage (Necessary Operations)
+## Remaining Quota Usage (Minimal - Fallback Only)
 
 ### Per-User Operations
-| Function | API Call | Quota | When |
-|----------|----------|-------|------|
-| resolve-channel-id | channels.list (forHandle) | 1 | Adding channel |
-| resolve-channel-id | search.list (fallback) | 100 | If handle fails |
-| resolve-channel-id | channels.list (get details) | 1 | Adding channel |
+| Function | Method | Quota | When |
+|----------|--------|-------|------|
+| resolve-channel-id | ✅ HTML Scraping (primary) | 0 | Adding channel |
+| resolve-channel-id | ⚠️ YouTube API (fallback) | 1-102 | Only if scraping fails |
 | subscribe-youtube-webhook | None | 0 | Adding channel |
 | delete-channel | None | 0 | Removing channel |
 
@@ -67,6 +83,28 @@ SAVED:  510 quota × 100% = 98% reduction
 | poll-rss-feeds | RSS feeds only | 0 ✅ | Every 12h |
 | renew-websub-subscriptions | None | 0 ✅ | Every 24h |
 | update-competitor-channels | search + videos | ~100 | Daily (existing) |
+
+---
+
+## Quota-Free Channel Resolution (NEW!)
+
+### How It Works
+Instead of using the YouTube Data API `channels.list(forHandle)` endpoint:
+
+1. **Fetch channel page**: `GET https://www.youtube.com/@handle`
+2. **Extract channel ID**: Parse HTML for patterns like `"channelId":"UC..."` 
+3. **Validate via RSS**: Confirm channel exists by fetching RSS feed
+4. **Extract metadata**: Get channel name, thumbnail from HTML/RSS
+
+### Code Location
+```
+supabase/functions/_shared/channel-resolver.ts
+```
+
+### Resolution Priority
+1. **Cache check** - Previously resolved channels (instant, 0 quota)
+2. **HTML Scraping** - Primary method (0 quota)
+3. **YouTube API** - Fallback only if scraping fails (1-102 quota)
 
 ---
 

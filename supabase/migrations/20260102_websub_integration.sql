@@ -1,4 +1,4 @@
--- ============================================
+﻿-- ============================================
 -- WebSub Integration Migration
 -- YouTube PubSubHubbub webhook-first architecture
 -- ============================================

@@ -1,3 +1,5 @@
+/// <reference types="https://deno.land/x/types/index.d.ts" />
+// @ts-ignore - Deno types are available at runtime in Supabase Edge Functions
 
 interface ApiKeyStatus {
   key: string;

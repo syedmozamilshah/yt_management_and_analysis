@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { makeYouTubeApiRequest } from "../_shared/youtube-api-keys.ts"
+import { resolveChannelIdWithoutApi, canResolveWithoutApi } from "../_shared/channel-resolver.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +16,7 @@ interface ResolveChannelResponse {
   channel_subscribers: number;
   rss_feed_url: string;
   cached: boolean;
+  resolution_method?: string; // 'cache' | 'scrape' | 'rss_validation' | 'youtube_api'
 }
 
 serve(async (req: Request) => {
@@ -112,7 +114,8 @@ serve(async (req: Request) => {
           channel_thumbnail: cached.channel_thumbnail,
           channel_subscribers: cached.channel_subscribers || 0,
           rss_feed_url: cached.rss_feed_url || `https://www.youtube.com/feeds/videos.xml?channel_id=${cached.channel_id}`,
-          cached: true
+          cached: true,
+          resolution_method: 'cache'
         }
         return new Response(JSON.stringify(response), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -120,6 +123,59 @@ serve(async (req: Request) => {
       }
     }
 
+    // ========================================
+    // QUOTA-FREE RESOLUTION (PRIMARY METHOD)
+    // ========================================
+    // Try to resolve without using YouTube Data API to save quota
+    console.log('Attempting quota-free channel resolution...')
+    const quotaFreeResult = await resolveChannelIdWithoutApi(channelUrl)
+    
+    if (quotaFreeResult) {
+      console.log('Successfully resolved channel via quota-free method:', quotaFreeResult.channel_name)
+      
+      // Save to cache
+      const { error: upsertError } = await supabase
+        .from('tracked_channels')
+        .upsert({
+          user_id: user.id,
+          channel_id: quotaFreeResult.channel_id,
+          channel_name: quotaFreeResult.channel_name,
+          channel_handle: quotaFreeResult.channel_handle,
+          channel_thumbnail: quotaFreeResult.channel_thumbnail,
+          channel_subscribers: quotaFreeResult.channel_subscribers,
+          rss_feed_url: quotaFreeResult.rss_feed_url,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,channel_id'
+        })
+
+      if (upsertError) {
+        console.error('Error saving channel to cache:', upsertError)
+      } else {
+        console.log('Channel saved to tracked_channels (quota-free)')
+      }
+
+      const response: ResolveChannelResponse = {
+        channel_id: quotaFreeResult.channel_id,
+        channel_name: quotaFreeResult.channel_name,
+        channel_handle: quotaFreeResult.channel_handle,
+        channel_thumbnail: quotaFreeResult.channel_thumbnail,
+        channel_subscribers: quotaFreeResult.channel_subscribers,
+        rss_feed_url: quotaFreeResult.rss_feed_url,
+        cached: false,
+        resolution_method: quotaFreeResult.resolution_method
+      }
+
+      return new Response(JSON.stringify(response), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    console.log('Quota-free resolution failed, falling back to YouTube API...')
+
+    // ========================================
+    // YOUTUBE API FALLBACK (ONLY IF QUOTA-FREE FAILS)
+    // ========================================
     // If we have a handle, resolve it to channel_id using YouTube API
     if (handle && !channelId) {
       console.log('Resolving handle to channel ID:', handle)
@@ -257,7 +313,8 @@ serve(async (req: Request) => {
       channel_thumbnail: channelThumbnail,
       channel_subscribers: subscriberCount,
       rss_feed_url: rssFeedUrl,
-      cached: false
+      cached: false,
+      resolution_method: 'youtube_api'
     }
 
     return new Response(JSON.stringify(response), {
