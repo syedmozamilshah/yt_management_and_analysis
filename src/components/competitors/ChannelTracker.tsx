@@ -168,8 +168,15 @@ const ChannelTracker: React.FC = () => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchData();
-    setRefreshing(false);
+    // Temporarily disabled - show error toast
+    setTimeout(() => {
+      toast({
+        title: 'Error',
+        description: 'Error fetching new videos',
+        variant: 'destructive'
+      });
+      setRefreshing(false);
+    }, 500);
   };
 
   const openYouTubeVideo = (url: string | null, videoId: string) => {
