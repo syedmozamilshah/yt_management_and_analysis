@@ -1,5 +1,9 @@
-/// <reference types="https://deno.land/x/types/index.d.ts" />
-// @ts-ignore - Deno types are available at runtime in Supabase Edge Functions
+// Deno types declaration for Supabase Edge Functions runtime
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+};
 
 interface ApiKeyStatus {
   key: string;
