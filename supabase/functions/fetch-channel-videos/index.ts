@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { makeYouTubeApiRequest } from '../_shared/youtube-api-keys.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +16,54 @@ interface VideoItem {
   published_at: string;
   youtube_url: string;
   view_count: number | null;
+}
+
+// Fetch view counts for multiple videos efficiently (up to 50 per batch = 1 quota unit)
+async function fetchViewCountsBatch(videoIds: string[]): Promise<Map<string, number>> {
+  const viewCounts = new Map<string, number>()
+  
+  if (videoIds.length === 0) return viewCounts
+  
+  // YouTube API allows up to 50 video IDs per request
+  const batchSize = 50
+  
+  for (let i = 0; i < videoIds.length; i += batchSize) {
+    const batch = videoIds.slice(i, i + batchSize)
+    const idsParam = batch.join(',')
+    
+    try {
+      // Only request statistics part for minimal quota usage (1 unit per request)
+      const url = `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${idsParam}`
+      const response = await makeYouTubeApiRequest(url)
+      
+      if (!response.ok) {
+        console.error(`YouTube API error fetching view counts: ${response.status}`)
+        continue
+      }
+      
+      const data = await response.json()
+      
+      if (data.items) {
+        for (const item of data.items) {
+          const viewCount = parseInt(item.statistics?.viewCount || '0', 10)
+          viewCounts.set(item.id, viewCount)
+        }
+      }
+      
+      console.log(`Fetched view counts for ${data.items?.length || 0} videos (batch ${Math.floor(i / batchSize) + 1})`)
+      
+    } catch (error) {
+      console.error('Error fetching view counts from YouTube API:', error)
+      // Continue without view counts - don't fail the whole operation
+    }
+    
+    // Small delay between API batches
+    if (i + batchSize < videoIds.length) {
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+  }
+  
+  return viewCounts
 }
 
 // Simple XML parser for Atom feeds
@@ -185,6 +234,16 @@ serve(async (req: Request) => {
 
     console.log(`Found ${allVideos.length} videos within ${fetchDays} day period`)
 
+    // Fetch view counts for all videos efficiently (1 API call per 50 videos)
+    const videoIds = allVideos.map(v => v.video_id)
+    let viewCounts = new Map<string, number>()
+    
+    if (videoIds.length > 0) {
+      console.log(`Fetching view counts for ${videoIds.length} videos...`)
+      viewCounts = await fetchViewCountsBatch(videoIds)
+      console.log(`Successfully fetched view counts for ${viewCounts.size} videos`)
+    }
+
     // Insert videos into tracked_videos, skipping duplicates
     let insertedCount = 0
     let skippedCount = 0
@@ -202,10 +261,14 @@ serve(async (req: Request) => {
         continue
       }
 
+      // Get view count from API results (or null if API failed)
+      const viewCount = viewCounts.get(video.video_id) || null
+
       const { error: insertError } = await supabase
         .from('tracked_videos')
         .insert({
           ...video,
+          view_count: viewCount,
           source: 'historical_fetch'
         })
 
@@ -223,6 +286,9 @@ serve(async (req: Request) => {
 
     console.log(`Inserted ${insertedCount} videos, skipped ${skippedCount} duplicates`)
 
+    // Calculate quota cost (1 unit per 50 videos)
+    const quotaCost = videoIds.length > 0 ? Math.ceil(videoIds.length / 50) : 0
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -231,7 +297,8 @@ serve(async (req: Request) => {
         videos_found: allVideos.length,
         videos_inserted: insertedCount,
         videos_skipped: skippedCount,
-        quota_cost: 0
+        view_counts_fetched: viewCounts.size,
+        quota_cost: quotaCost
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
