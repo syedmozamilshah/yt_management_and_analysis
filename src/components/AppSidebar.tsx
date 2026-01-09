@@ -30,7 +30,8 @@ import {
   ChevronDown,
   Plus,
   Search,
-  Rss
+  Rss,
+  Loader2
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { Button } from "@/components/ui/button"
@@ -46,22 +47,48 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useState } from "react"
+import { useToast } from "@/hooks/use-toast"
+import { addTrackedChannel } from "@/services/channelTrackerService"
 
 export function AppSidebar() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, isAdmin, signOut, adminDataMode, setAdminDataMode } = useAuth()
+  const { toast } = useToast()
   const [addChannelModalOpen, setAddChannelModalOpen] = useState(false)
   const [channelUrl, setChannelUrl] = useState('')
   const [daysPeriod, setDaysPeriod] = useState('7')
+  const [isAddingChannel, setIsAddingChannel] = useState(false)
 
-  const handleAnalyzeChannel = () => {
+  const handleAnalyzeChannel = async () => {
     if (!channelUrl.trim()) return;
-    setAddChannelModalOpen(false);
-    // Navigate to competitors page with the channel URL as a query param
-    navigate(`/competitors?channelUrl=${encodeURIComponent(channelUrl)}&days=${daysPeriod}`);
-    setChannelUrl('');
-    setDaysPeriod('7');
+    
+    setIsAddingChannel(true);
+    
+    try {
+      // Use channelTrackerService to add and track the channel (uses RSS - no API quota)
+      const result = await addTrackedChannel(channelUrl, parseInt(daysPeriod));
+      
+      toast({
+        title: "Channel Added!",
+        description: `Now tracking ${result.channel_name}. ${result.videos_fetched ? `Fetched ${result.videos_fetched} videos.` : ''}`
+      });
+      
+      setAddChannelModalOpen(false);
+      // Navigate to competitors page with channelId to show videos from tracked_videos table
+      navigate(`/competitors?channelId=${encodeURIComponent(result.channel_id)}&channelName=${encodeURIComponent(result.channel_name || '')}`);
+      setChannelUrl('');
+      setDaysPeriod('7');
+    } catch (error: any) {
+      console.error('Error adding channel:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add channel. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAddingChannel(false);
+    }
   }
 
   // Menu items - Reorganized sidebar
@@ -94,11 +121,6 @@ export function AppSidebar() {
       title: "Competitor",
       url: "/tools?tab=competitor",
       icon: Users,
-    },
-    {
-      title: "Channel Tracker",
-      url: "/channel-tracker",
-      icon: Rss,
     }
   ]
 
@@ -196,11 +218,20 @@ export function AppSidebar() {
                     </div>
                     <Button
                       onClick={handleAnalyzeChannel}
-                      disabled={!channelUrl.trim()}
+                      disabled={!channelUrl.trim() || isAddingChannel}
                       className="w-full bg-[#cc0000] hover:bg-[#aa0000] text-white"
                     >
-                      <Search className="w-4 h-4 mr-2" />
-                      Analyze Channel
+                      {isAddingChannel ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Adding Channel...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="w-4 h-4 mr-2" />
+                          Analyze Channel
+                        </>
+                      )}
                     </Button>
                   </div>
                 </DialogContent>

@@ -8,9 +8,10 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Eye, Users, Download, Search, Sparkles, Target, TrendingUp, Zap, ArrowRight, Youtube, ChevronRight } from 'lucide-react';
+import { Plus, Eye, Users, Download, Search, Sparkles, Target, TrendingUp, Zap, ArrowRight, Youtube, ChevronRight, RefreshCw } from 'lucide-react';
 import { formatNumber, formatDate } from '@/utils/formatNumbers';
 import { NicheInput } from '@/components/NicheInput';
+import { getTrackedVideos, getTrackedChannels, TrackedChannel, TrackedVideo } from '@/services/channelTrackerService';
 
 interface ChannelVideo {
   id: string;
@@ -45,28 +46,138 @@ const UserChannelAnalysis = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { toast } = useToast();
   const [autoTriggered, setAutoTriggered] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [currentChannelId, setCurrentChannelId] = useState<string | null>(null);
 
-  // Auto-trigger analysis from URL params (e.g., from sidebar Add Competitor)
+  // Auto-trigger analysis from URL params
   useEffect(() => {
+    const channelId = searchParams.get('channelId');
+    const channelName = searchParams.get('channelName');
     const urlChannelUrl = searchParams.get('channelUrl');
     const urlDays = searchParams.get('days');
     
-    if (urlChannelUrl && !autoTriggered) {
+    if (autoTriggered) return;
+    
+    // New flow: channelId param means load from tracked_videos table
+    if (channelId) {
+      setAutoTriggered(true);
+      setCurrentChannelId(channelId);
+      setSearchParams({}, { replace: true });
+      loadTrackedVideos(channelId, channelName || 'Channel');
+      return;
+    }
+    
+    // Legacy flow: channelUrl param means call edge function
+    if (urlChannelUrl) {
       setChannelUrl(decodeURIComponent(urlChannelUrl));
       if (urlDays) {
         setDaysPeriod(urlDays);
       }
       setAutoTriggered(true);
-      
-      // Clear URL params after reading them
       setSearchParams({}, { replace: true });
-      
-      // Trigger analysis after state is set
       setTimeout(() => {
         triggerAnalysis(decodeURIComponent(urlChannelUrl), urlDays || '90');
       }, 100);
     }
   }, [searchParams, autoTriggered]);
+
+  // Load videos from tracked_videos table (NO API quota)
+  const loadTrackedVideos = async (channelId: string, channelName: string) => {
+    setLoading(true);
+    setResults(null);
+    
+    try {
+      // Fetch videos from tracked_videos table
+      const { data: videos, error } = await supabase
+        .from('tracked_videos')
+        .select('*')
+        .eq('channel_id', channelId)
+        .order('published_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      if (!videos || videos.length === 0) {
+        toast({
+          title: "No Videos Found",
+          description: "No videos found for this channel. Try refreshing to fetch latest videos.",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+      
+      // Get channel info from tracked_channels
+      const { data: channelData } = await supabase
+        .from('tracked_channels')
+        .select('channel_name, channel_subscribers')
+        .eq('channel_id', channelId)
+        .single();
+      
+      // Transform to AnalysisResult format
+      const transformedVideos: ChannelVideo[] = videos.map(v => ({
+        id: v.video_id,
+        title: v.title,
+        viewCount: v.view_count || 0,
+        uploadDate: v.published_at,
+        thumbnailUrl: v.thumbnail_url || `https://i.ytimg.com/vi/${v.video_id}/hqdefault.jpg`,
+        youtubeUrl: v.youtube_url || `https://www.youtube.com/watch?v=${v.video_id}`
+      }));
+      
+      setResults({
+        channelName: channelData?.channel_name || channelName,
+        subscriberCount: channelData?.channel_subscribers || 0,
+        totalVideosFound: transformedVideos.length,
+        videos: transformedVideos,
+        daysPeriod: 0 // Not applicable for tracked videos
+      });
+      
+      toast({
+        title: "🎉 Videos Loaded!",
+        description: `Found ${transformedVideos.length} video${transformedVideos.length > 1 ? 's' : ''} from ${channelData?.channel_name || channelName}`
+      });
+    } catch (error) {
+      console.error('Error loading tracked videos:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load videos. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Refresh videos for current channel
+  const handleRefreshChannel = async () => {
+    if (!currentChannelId) return;
+    
+    setRefreshing(true);
+    try {
+      // Call poll-rss-feeds to fetch new videos
+      const { error } = await supabase.functions.invoke('poll-rss-feeds');
+      
+      if (error) {
+        console.error('poll-rss-feeds error:', error);
+      }
+      
+      // Reload videos from database
+      await loadTrackedVideos(currentChannelId, results?.channelName || 'Channel');
+      
+      toast({
+        title: "Refreshed!",
+        description: "Videos have been updated."
+      });
+    } catch (err) {
+      console.error('Refresh error:', err);
+      toast({
+        title: "Error",
+        description: "Failed to refresh videos.",
+        variant: "destructive"
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const triggerAnalysis = async (url: string, days: string) => {
     if (!url.trim()) return;
@@ -465,14 +576,28 @@ const UserChannelAnalysis = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
+                  {currentChannelId && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRefreshChannel}
+                      disabled={refreshing}
+                      className="text-[#888888] hover:text-white hover:bg-[#272727]"
+                    >
+                      <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                      {refreshing ? 'Refreshing...' : 'Refresh'}
+                    </Button>
+                  )}
                   <div className="px-4 py-2 bg-[#0f0f0f] border border-[#272727] rounded-xl text-center">
                     <div className="text-2xl font-bold text-[#cc0000]">{results.videos.length}</div>
                     <div className="text-xs text-[#666666]">Videos Found</div>
                   </div>
-                  <div className="px-4 py-2 bg-[#0f0f0f] border border-[#272727] rounded-xl text-center">
-                    <div className="text-2xl font-bold text-[#f1f1f1]">{results.daysPeriod}</div>
-                    <div className="text-xs text-[#666666]">Days Period</div>
-                  </div>
+                  {results.daysPeriod > 0 && (
+                    <div className="px-4 py-2 bg-[#0f0f0f] border border-[#272727] rounded-xl text-center">
+                      <div className="text-2xl font-bold text-[#f1f1f1]">{results.daysPeriod}</div>
+                      <div className="text-xs text-[#666666]">Days Period</div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
