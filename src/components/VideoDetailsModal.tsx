@@ -148,7 +148,7 @@ export const VideoDetailsModal: React.FC<VideoDetailsModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-[#0f0f0f] border border-[#272727] text-white p-0">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-[#0f0f0f] border border-[#272727] text-white p-0" hideCloseButton>
         <DialogTitle className="sr-only">{video.title}</DialogTitle>
         <div className="relative">
           {/* Hero Section with Thumbnail - Fully visible and responsive */}
