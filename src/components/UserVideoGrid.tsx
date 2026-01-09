@@ -47,18 +47,21 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
   const [loadingChannels, setLoadingChannels] = useState(false);
   const [deletingChannelId, setDeletingChannelId] = useState<string | null>(null);
 
-  // Open refresh dialog and auto-refresh channels
+  // Open refresh dialog - load channels instantly, poll in background
   const handleOpenRefreshDialog = async () => {
     setRefreshDialogOpen(true);
     setLoadingChannels(true);
     
     try {
-      // First poll RSS feeds to fetch new videos
-      await supabase.functions.invoke('poll-rss-feeds');
-      
-      // Then load tracked channels
+      // Load tracked channels first (fast)
       const channels = await getTrackedChannels();
       setTrackedChannels(channels);
+      setLoadingChannels(false);
+      
+      // Then poll RSS feeds in background (don't block UI)
+      supabase.functions.invoke('poll-rss-feeds').catch(err => {
+        console.error('Background RSS poll error:', err);
+      });
     } catch (error) {
       console.error('Error loading channels:', error);
       toast({
@@ -66,7 +69,6 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
         description: "Failed to load tracked channels",
         variant: "destructive"
       });
-    } finally {
       setLoadingChannels(false);
     }
   };
@@ -312,42 +314,49 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
   return (
     <div className="space-y-6">
       {/* Filter Section */}
-      <div className="flex items-center gap-2">
-        <div className="flex-1">
-          <FilterBar
-            filters={filters}
-            onFiltersChange={setFilters}
-            availableNiches={availableNiches}
-            filteredCount={filteredVideos.length}
-            totalCount={videos.length}
-            videos={videos}
-          />
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="flex-1">
+            <FilterBar
+              filters={filters}
+              onFiltersChange={setFilters}
+              availableNiches={availableNiches}
+              filteredCount={filteredVideos.length}
+              totalCount={videos.length}
+              videos={videos}
+            />
+          </div>
+          {!isSelectionMode && !isMobile && filteredVideos.length > 0 && (
+            <Button
+              onClick={enterSelectionMode}
+              variant="ghost"
+              size="sm"
+              className="text-[#888888] hover:text-[#f1f1f1] hover:bg-[#272727] gap-1.5 flex-shrink-0"
+            >
+              <CheckSquare className="w-4 h-4" />
+              Select
+            </Button>
+          )}
         </div>
-        {!isSelectionMode && !isMobile && filteredVideos.length > 0 && (
+        
+        {/* Refresh Tracked Channels Button - Below filter row */}
+        <div className="flex justify-end">
           <Button
-            onClick={enterSelectionMode}
+            onClick={handleOpenRefreshDialog}
             variant="ghost"
             size="sm"
-            className="text-[#888888] hover:text-[#f1f1f1] hover:bg-[#272727] gap-1.5 flex-shrink-0"
+            className="text-[#888888] hover:text-[#f1f1f1] hover:bg-[#272727] gap-1.5"
+            title="Tracked Channels"
           >
-            <CheckSquare className="w-4 h-4" />
-            Select
+            <RefreshCw className="w-4 h-4" />
+            Refresh Channels
           </Button>
-        )}
+        </div>
         
-        {/* Refresh Tracked Channels Button */}
-        <Button
-          onClick={handleOpenRefreshDialog}
-          variant="ghost"
-          size="icon"
-          className="text-[#888888] hover:text-[#f1f1f1] hover:bg-[#272727] flex-shrink-0"
-          title="Tracked Channels"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </Button>
-        
-        {/* Tracked Channels Dialog */}
-        <Dialog open={refreshDialogOpen} onOpenChange={setRefreshDialogOpen}>
+      </div>
+      
+      {/* Tracked Channels Dialog */}
+      <Dialog open={refreshDialogOpen} onOpenChange={setRefreshDialogOpen}>
           <DialogContent className="bg-[#181818] border border-[#272727] text-white sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="text-white flex items-center gap-2">
@@ -416,7 +425,6 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
             </div>
           </DialogContent>
         </Dialog>
-      </div>
       
       {/* Results Section */}
       {filteredVideos.length === 0 ? (
