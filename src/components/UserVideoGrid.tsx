@@ -314,45 +314,51 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
   return (
     <div className="space-y-6">
       {/* Filter Section */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <div className="flex-1">
-            <FilterBar
-              filters={filters}
-              onFiltersChange={setFilters}
-              availableNiches={availableNiches}
-              filteredCount={filteredVideos.length}
-              totalCount={videos.length}
-              videos={videos}
-            />
-          </div>
-          {!isSelectionMode && !isMobile && filteredVideos.length > 0 && (
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <FilterBar
+            filters={filters}
+            onFiltersChange={setFilters}
+            availableNiches={availableNiches}
+            filteredCount={filteredVideos.length}
+            totalCount={videos.length}
+            videos={videos}
+          />
+        </div>
+        {!isSelectionMode && !isMobile && filteredVideos.length > 0 && (
+          <div className="flex flex-col gap-1 flex-shrink-0">
             <Button
               onClick={enterSelectionMode}
               variant="ghost"
               size="sm"
-              className="text-[#888888] hover:text-[#f1f1f1] hover:bg-[#272727] gap-1.5 flex-shrink-0"
+              className="text-[#888888] hover:text-[#f1f1f1] hover:bg-[#272727] gap-1.5"
             >
               <CheckSquare className="w-4 h-4" />
               Select
             </Button>
-          )}
-        </div>
-        
-        {/* Refresh Tracked Channels Button - Below filter row */}
-        <div className="flex justify-end">
+            <Button
+              onClick={handleOpenRefreshDialog}
+              variant="ghost"
+              size="icon"
+              className="text-[#888888] hover:text-[#f1f1f1] hover:bg-[#272727] h-8 w-8 mx-auto"
+              title="Refresh Channels"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+        {/* Show refresh button even when no videos or selection mode */}
+        {(isSelectionMode || isMobile || filteredVideos.length === 0) && (
           <Button
             onClick={handleOpenRefreshDialog}
             variant="ghost"
-            size="sm"
-            className="text-[#888888] hover:text-[#f1f1f1] hover:bg-[#272727] gap-1.5"
-            title="Tracked Channels"
+            size="icon"
+            className="text-[#888888] hover:text-[#f1f1f1] hover:bg-[#272727] flex-shrink-0"
+            title="Refresh Channels"
           >
             <RefreshCw className="w-4 h-4" />
-            Refresh Channels
           </Button>
-        </div>
-        
+        )}
       </div>
       
       {/* Tracked Channels Dialog */}
