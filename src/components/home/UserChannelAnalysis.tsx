@@ -55,6 +55,7 @@ const UserChannelAnalysis = () => {
     const channelName = searchParams.get('channelName');
     const urlChannelUrl = searchParams.get('channelUrl');
     const urlDays = searchParams.get('days');
+    const shouldRefresh = searchParams.get('refresh') === 'true';
     
     if (autoTriggered) return;
     
@@ -63,7 +64,13 @@ const UserChannelAnalysis = () => {
       setAutoTriggered(true);
       setCurrentChannelId(channelId);
       setSearchParams({}, { replace: true });
-      loadTrackedVideos(channelId, channelName || 'Channel');
+      
+      // If refresh=true, poll RSS feeds first to fetch new videos
+      if (shouldRefresh) {
+        pollAndLoadTrackedVideos(channelId, channelName || 'Channel');
+      } else {
+        loadTrackedVideos(channelId, channelName || 'Channel');
+      }
       return;
     }
     
@@ -86,6 +93,91 @@ const UserChannelAnalysis = () => {
     setLoading(true);
     setResults(null);
     
+    try {
+      // Fetch videos from tracked_videos table
+      const { data: videos, error } = await supabase
+        .from('tracked_videos')
+        .select('*')
+        .eq('channel_id', channelId)
+        .order('published_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      if (!videos || videos.length === 0) {
+        toast({
+          title: "No Videos Found",
+          description: "No videos found for this channel. Try refreshing to fetch latest videos.",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+      
+      // Get channel info from tracked_channels
+      const { data: channelData } = await supabase
+        .from('tracked_channels')
+        .select('channel_name, channel_subscribers')
+        .eq('channel_id', channelId)
+        .single();
+      
+      // Transform to AnalysisResult format
+      const transformedVideos: ChannelVideo[] = videos.map(v => ({
+        id: v.video_id,
+        title: v.title,
+        viewCount: v.view_count || 0,
+        uploadDate: v.published_at,
+        thumbnailUrl: v.thumbnail_url || `https://i.ytimg.com/vi/${v.video_id}/hqdefault.jpg`,
+        youtubeUrl: v.youtube_url || `https://www.youtube.com/watch?v=${v.video_id}`
+      }));
+      
+      setResults({
+        channelName: channelData?.channel_name || channelName,
+        subscriberCount: channelData?.channel_subscribers || 0,
+        totalVideosFound: transformedVideos.length,
+        videos: transformedVideos,
+        daysPeriod: 0 // Not applicable for tracked videos
+      });
+      
+      toast({
+        title: "🎉 Videos Loaded!",
+        description: `Found ${transformedVideos.length} video${transformedVideos.length > 1 ? 's' : ''} from ${channelData?.channel_name || channelName}`
+      });
+    } catch (error) {
+      console.error('Error loading tracked videos:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load videos. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Poll RSS feeds first, then load videos (used when navigating from popup with refresh=true)
+  const pollAndLoadTrackedVideos = async (channelId: string, channelName: string) => {
+    setLoading(true);
+    setResults(null);
+    
+    try {
+      // First poll RSS feeds to fetch any new videos
+      await supabase.functions.invoke('poll-rss-feeds');
+      
+      // Then load from database
+      await loadTrackedVideosInternal(channelId, channelName);
+    } catch (error) {
+      console.error('Error polling and loading tracked videos:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch new videos. Please try again.",
+        variant: "destructive"
+      });
+      setLoading(false);
+    }
+  };
+
+  // Internal load function that doesn't manage loading state
+  const loadTrackedVideosInternal = async (channelId: string, channelName: string) => {
     try {
       // Fetch videos from tracked_videos table
       const { data: videos, error } = await supabase
@@ -673,7 +765,9 @@ const UserChannelAnalysis = () => {
                     <div className="flex items-center gap-4 mt-2">
                       <span className="flex items-center gap-1.5 text-[#888888] text-xs">
                         <Eye className="w-3.5 h-3.5 text-[#cc0000]" />
-                        <span className="font-medium text-[#f1f1f1]">{formatNumber(video.viewCount)}</span> views
+                        <span className="font-medium text-[#f1f1f1]">
+                          {video.viewCount > 0 ? formatNumber(video.viewCount) : '—'}
+                        </span> {video.viewCount > 0 ? 'views' : ''}
                       </span>
                       <span className="text-[#666666] text-xs">
                         {formatDate(video.uploadDate)}
@@ -720,7 +814,9 @@ const UserChannelAnalysis = () => {
                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                           <div className="absolute bottom-3 left-3 right-3">
                             <p className="text-white text-sm font-medium line-clamp-2">{video.title}</p>
-                            <p className="text-white/70 text-xs mt-1">{formatNumber(video.viewCount)} views</p>
+                            <p className="text-white/70 text-xs mt-1">
+                              {video.viewCount > 0 ? `${formatNumber(video.viewCount)} views` : 'Views not available'}
+                            </p>
                           </div>
                         </div>
                         <div>
