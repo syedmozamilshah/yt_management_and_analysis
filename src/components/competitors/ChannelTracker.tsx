@@ -17,6 +17,7 @@ import {
   Rss,
   CheckCircle
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import {
   TrackedChannel,
   TrackedVideo,
@@ -168,15 +169,39 @@ const ChannelTracker: React.FC = () => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    // Temporarily disabled - show error toast
-    setTimeout(() => {
+    try {
+      // Trigger backend poll to fetch any newly published videos
+      const { data, error } = await supabase.functions.invoke('poll-rss-feeds');
+
+      if (error) {
+        console.error('poll-rss-feeds error:', error);
+        toast({
+          title: 'Refresh Failed',
+          description: 'Could not check channels for new uploads.',
+          variant: 'destructive'
+        });
+      } else if (data) {
+        const inserted = typeof data.total_videos_inserted === 'number' ? data.total_videos_inserted : 0;
+        toast({
+          title: 'Refreshed',
+          description: inserted > 0
+            ? `Fetched ${inserted} new ${inserted === 1 ? 'video' : 'videos'}.`
+            : 'No new videos found.',
+        });
+      }
+
+      // Reload local lists after polling completes
+      await fetchData();
+    } catch (err) {
+      console.error('Refresh error:', err);
       toast({
         title: 'Error',
-        description: 'Error fetching new videos',
+        description: 'Something went wrong while refreshing.',
         variant: 'destructive'
       });
+    } finally {
       setRefreshing(false);
-    }, 500);
+    }
   };
 
   const openYouTubeVideo = (url: string | null, videoId: string) => {
