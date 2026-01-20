@@ -37,14 +37,13 @@ export const DataSourceSelection: React.FC<DataSourceSelectionProps> = ({
             .select('*', { count: 'exact', head: true })
             .eq('is_favorite', true);
 
-          // Outliers count - videos where view_count > channel_subscribers
+          // Outliers count - calculate based on channel averages
           const { data: allVideos } = await (supabase as any)
             .from('user_videos')
-            .select('view_count, channel_subscribers');
+            .select('view_count, channel_subscribers, channel_name');
           
-          const outlierCount = (allVideos || []).filter((v: any) => 
-            v.view_count && v.channel_subscribers && v.view_count > v.channel_subscribers
-          ).length;
+          // Calculate outliers: videos with views > average for their channel
+          const outlierCount = calculateOutlierCount(allVideos || []);
 
           setFavoritesCount(favCount || 0);
           setOutliersCount(outlierCount);
@@ -56,15 +55,14 @@ export const DataSourceSelection: React.FC<DataSourceSelectionProps> = ({
             .eq('user_id', user.id)
             .eq('is_favorite', true);
 
-          // Outliers count for user's videos
+          // Outliers count for user's videos - calculate based on channel averages
           const { data: userVideos } = await (supabase as any)
             .from('user_videos')
-            .select('view_count, channel_subscribers')
+            .select('view_count, channel_subscribers, channel_name')
             .eq('user_id', user.id);
           
-          const userOutlierCount = (userVideos || []).filter((v: any) => 
-            v.view_count && v.channel_subscribers && v.view_count > v.channel_subscribers
-          ).length;
+          // Calculate outliers: videos with views > average for their channel
+          const userOutlierCount = calculateOutlierCount(userVideos || []);
 
           setFavoritesCount(userFavCount || 0);
           setOutliersCount(userOutlierCount);
@@ -78,6 +76,45 @@ export const DataSourceSelection: React.FC<DataSourceSelectionProps> = ({
 
     fetchCounts();
   }, [shouldShowAllData, user?.id]);
+
+  // Calculate outlier count: videos where view_count > channel average OR view_count > subscribers
+  const calculateOutlierCount = (videos: any[]) => {
+    if (!videos || videos.length === 0) return 0;
+
+    // Group videos by channel and calculate averages
+    const channelStats: { [channel: string]: { totalViews: number; count: number } } = {};
+    
+    for (const video of videos) {
+      const channelKey = video.channel_name || 'unknown';
+      if (!channelStats[channelKey]) {
+        channelStats[channelKey] = { totalViews: 0, count: 0 };
+      }
+      channelStats[channelKey].totalViews += video.view_count || 0;
+      channelStats[channelKey].count++;
+    }
+
+    // Calculate channel averages
+    const channelAverages: { [channel: string]: number } = {};
+    for (const [channel, stats] of Object.entries(channelStats)) {
+      channelAverages[channel] = stats.count > 0 ? stats.totalViews / stats.count : 0;
+    }
+
+    // Count outliers: videos where views > channel average OR views > subscribers
+    let outlierCount = 0;
+    for (const video of videos) {
+      const channelKey = video.channel_name || 'unknown';
+      const avgViews = channelAverages[channelKey] || 0;
+      
+      const isOutlier = video.view_count && (
+        video.view_count > avgViews || 
+        (video.channel_subscribers && video.view_count > video.channel_subscribers)
+      );
+      
+      if (isOutlier) outlierCount++;
+    }
+
+    return outlierCount;
+  };
 
   const canUseFavorites = favoritesCount >= 5;
 
@@ -116,13 +153,13 @@ export const DataSourceSelection: React.FC<DataSourceSelectionProps> = ({
               <p className="text-[#aaaaaa] mb-4">
                 {shouldShowAllData 
                   ? 'Scan from our curated collection of viral videos that broke through subscriber barriers'
-                  : 'Scan from videos you\'ve saved in your collection'
+                  : 'Videos performing above their channel average - proven winners in your collection'
                 }
               </p>
               <div className="flex items-center gap-2 mb-2">
                 <Users className="w-4 h-4 text-[#cc0000]" />
                 <span className="text-[#f1f1f1] font-medium">
-                  {loading ? '...' : outliersCount.toLocaleString()} videos available
+                  {loading ? '...' : outliersCount.toLocaleString()} outlier videos
                 </span>
               </div>
               <div className="text-[#cc0000] text-sm">

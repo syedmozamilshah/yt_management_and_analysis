@@ -1,0 +1,15 @@
+{
+  "typescript.validate.enable": true,
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.tsserver.experimental.enableProjectDiagnostics": false,
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "files.exclude": {
+    "**/node_modules": true
+  },
+  "files.associations": {
+    "supabase/functions/**/*.ts": "ignore"
+  },
+  "typescript.preferences.includePackageJsonAutoImports": "on"
+}

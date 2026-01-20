@@ -75,7 +75,7 @@ const UserAddVideo = () => {
 
       if (error) throw error;
 
-      // Insert into user_videos table with user_id
+      // Insert into user_videos table with user_id and channel_id
       const { error: insertError } = await (supabase as any)
         .from('user_videos')
         .insert({
@@ -84,6 +84,7 @@ const UserAddVideo = () => {
           youtube_url: url,
           video_id: videoId,
           thumbnail_url: data.thumbnailUrl,
+          channel_id: data.channelId,
           channel_name: data.channelName,
           channel_subscribers: data.channelSubscribers,
           upload_date: data.uploadDate,
@@ -92,6 +93,34 @@ const UserAddVideo = () => {
         });
 
       if (insertError) throw insertError;
+
+      // Create subscription for this channel to auto-sync future videos
+      if (data.channelId) {
+        // First, ensure tracked_channel exists
+        await (supabase as any)
+          .from('tracked_channels')
+          .upsert({
+            channel_id: data.channelId,
+            channel_name: data.channelName,
+            rss_feed_url: `https://www.youtube.com/feeds/videos.xml?channel_id=${data.channelId}`,
+            is_active: true,
+            user_id: user.id
+          }, {
+            onConflict: 'channel_id'
+          });
+
+        // Then create user subscription
+        await (supabase as any)
+          .from('user_channel_subscriptions')
+          .upsert({
+            user_id: user.id,
+            channel_id: data.channelId,
+            niche: niche.trim() || 'General',
+            is_active: true
+          }, {
+            onConflict: 'user_id,channel_id'
+          });
+      }
 
       // If a custom niche image URL is provided, save to user_niches
       if (nicheImageUrl.trim()) {

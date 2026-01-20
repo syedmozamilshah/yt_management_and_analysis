@@ -1,9 +1,34 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { makeYouTubeApiRequest } from '../_shared/youtube-api-keys.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Fetch view count for a single video (1 quota unit per 50 videos)
+async function fetchVideoViewCount(videoId: string): Promise<number | null> {
+  try {
+    const url = `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoId}`
+    const response = await makeYouTubeApiRequest(url)
+    
+    if (!response.ok) {
+      console.error(`YouTube API error: ${response.status}`)
+      return null
+    }
+    
+    const data = await response.json()
+    
+    if (data.items && data.items.length > 0) {
+      return parseInt(data.items[0].statistics?.viewCount || '0', 10)
+    }
+    
+    return null
+  } catch (error) {
+    console.error('Error fetching view count:', error)
+    return null
+  }
 }
 
 // Simple XML parser for Atom feeds
@@ -212,7 +237,13 @@ serve(async (req: Request) => {
             continue
           }
 
-          // Insert new video
+          // Fetch view count from YouTube API (1 quota unit per video)
+          // This is acceptable because webhooks are triggered infrequently (only for new videos)
+          console.log('Fetching view count for new video:', entry.videoId)
+          const viewCount = await fetchVideoViewCount(entry.videoId)
+          console.log('View count fetched:', viewCount)
+
+          // Insert new video WITH view count
           const { error: insertError } = await supabase
             .from('tracked_videos')
             .insert({
@@ -222,6 +253,8 @@ serve(async (req: Request) => {
               thumbnail_url: thumbnailUrl,
               youtube_url: youtubeUrl,
               published_at: entry.publishedAt || new Date().toISOString(),
+              view_count: viewCount,
+              view_count_updated_at: viewCount !== null ? new Date().toISOString() : null,
               source: 'websub'
             })
 

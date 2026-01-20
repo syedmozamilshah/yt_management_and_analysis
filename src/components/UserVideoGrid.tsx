@@ -5,14 +5,12 @@ import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Video } from '@/types/video';
 import { FilterState, defaultFilters, applyFilters, getUniqueNiches, getViewCountBounds, getSubscriberCountBounds } from '@/utils/filterUtils';
-import { Grid3X3, Sparkles, Plus, Trash2, X, CheckSquare, RefreshCw, Youtube, ChevronRight, Loader2 } from 'lucide-react';
+import { Grid3X3, Sparkles, Plus, Trash2, X, CheckSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { getTrackedChannels, removeTrackedChannel, TrackedChannel } from '@/services/channelTrackerService';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,69 +38,6 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Tracked channels popup state
-  const [refreshDialogOpen, setRefreshDialogOpen] = useState(false);
-  const [trackedChannels, setTrackedChannels] = useState<TrackedChannel[]>([]);
-  const [loadingChannels, setLoadingChannels] = useState(false);
-  const [deletingChannelId, setDeletingChannelId] = useState<string | null>(null);
-
-  // Open refresh dialog - load channels instantly, poll in background
-  const handleOpenRefreshDialog = async () => {
-    setRefreshDialogOpen(true);
-    setLoadingChannels(true);
-    
-    try {
-      // Load tracked channels first (fast)
-      const channels = await getTrackedChannels();
-      setTrackedChannels(channels);
-      setLoadingChannels(false);
-      
-      // Then poll RSS feeds in background (don't block UI)
-      supabase.functions.invoke('poll-rss-feeds').catch(err => {
-        console.error('Background RSS poll error:', err);
-      });
-    } catch (error) {
-      console.error('Error loading channels:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load tracked channels",
-        variant: "destructive"
-      });
-      setLoadingChannels(false);
-    }
-  };
-  
-  // Delete a tracked channel
-  const handleDeleteChannel = async (channelId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setDeletingChannelId(channelId);
-    
-    try {
-      await removeTrackedChannel(channelId);
-      setTrackedChannels(prev => prev.filter(c => c.channel_id !== channelId));
-      toast({
-        title: "Channel Removed",
-        description: "Channel has been removed from tracking"
-      });
-    } catch (error) {
-      console.error('Error deleting channel:', error);
-      toast({
-        title: "Error",
-        description: "Failed to remove channel",
-        variant: "destructive"
-      });
-    } finally {
-      setDeletingChannelId(null);
-    }
-  };
-  
-  // Navigate to channel and fetch new videos
-  const handleViewChannel = async (channel: TrackedChannel) => {
-    setRefreshDialogOpen(false);
-    // Navigate with channelId - the channel analysis page will poll for new videos
-    navigate(`/competitors?channelId=${encodeURIComponent(channel.channel_id)}&channelName=${encodeURIComponent(channel.channel_name || '')}&refresh=true`);
-  };
 
   // Fetch user's personal videos
   const { data: videos = [], isLoading, refetch } = useQuery({
@@ -336,101 +271,9 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
               <CheckSquare className="w-4 h-4" />
               Select
             </Button>
-            <Button
-              onClick={handleOpenRefreshDialog}
-              variant="ghost"
-              size="icon"
-              className="text-[#888888] hover:text-[#f1f1f1] hover:bg-[#272727] h-8 w-8 mx-auto"
-              title="Refresh Channels"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </Button>
           </div>
         )}
-        {/* Show refresh button even when no videos or selection mode */}
-        {(isSelectionMode || isMobile || filteredVideos.length === 0) && (
-          <Button
-            onClick={handleOpenRefreshDialog}
-            variant="ghost"
-            size="icon"
-            className="text-[#888888] hover:text-[#f1f1f1] hover:bg-[#272727] flex-shrink-0"
-            title="Refresh Channels"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </Button>
-        )}
       </div>
-      
-      {/* Tracked Channels Dialog */}
-      <Dialog open={refreshDialogOpen} onOpenChange={setRefreshDialogOpen}>
-          <DialogContent className="bg-[#181818] border border-[#272727] text-white sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-white flex items-center gap-2">
-                <RefreshCw className="w-5 h-5 text-[#cc0000]" />
-                Tracked Channels
-              </DialogTitle>
-            </DialogHeader>
-            <div className="mt-2 space-y-4">
-              <p className="text-sm text-[#888888]">
-                Fetch new videos from channels and add to your ideation board.
-              </p>
-              
-              {/* Channels List */}
-              <div className="space-y-2 max-h-[350px] overflow-y-auto">
-                {loadingChannels ? (
-                  <div className="flex flex-col items-center justify-center py-8 gap-3">
-                    <Loader2 className="w-6 h-6 text-[#cc0000] animate-spin" />
-                    <p className="text-sm text-[#666666]">Checking for new videos...</p>
-                  </div>
-                ) : trackedChannels.length === 0 ? (
-                  <div className="text-center py-8 text-[#666666]">
-                    <RefreshCw className="w-10 h-10 mx-auto mb-3 text-[#333333]" />
-                    <p>No channels tracked yet.</p>
-                    <p className="text-sm mt-1">Click "Add Channel" in the sidebar to start.</p>
-                  </div>
-                ) : (
-                  trackedChannels.map((channel) => (
-                    <div
-                      key={channel.id}
-                      onClick={() => handleViewChannel(channel)}
-                      className="flex items-center gap-3 p-3 bg-[#0f0f0f] border border-[#272727] rounded-lg hover:border-[#cc0000]/50 cursor-pointer transition-all group"
-                    >
-                      {channel.channel_thumbnail ? (
-                        <img
-                          src={channel.channel_thumbnail}
-                          alt={channel.channel_name || ''}
-                          className="w-10 h-10 rounded-full flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-[#272727] flex items-center justify-center flex-shrink-0">
-                          <Youtube className="w-5 h-5 text-[#666666]" />
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white font-medium truncate">{channel.channel_name}</p>
-                        <p className="text-sm text-[#666666] truncate">{channel.channel_handle || channel.channel_id}</p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => handleDeleteChannel(channel.channel_id, e)}
-                        disabled={deletingChannelId === channel.channel_id}
-                        className="opacity-0 group-hover:opacity-100 text-[#666666] hover:text-red-500 hover:bg-red-500/10 flex-shrink-0 transition-all"
-                      >
-                        {deletingChannelId === channel.channel_id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </Button>
-                      <ChevronRight className="w-4 h-4 text-[#666666] group-hover:text-[#cc0000] flex-shrink-0 transition-colors" />
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
       
       {/* Results Section */}
       {filteredVideos.length === 0 ? (

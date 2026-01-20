@@ -49,6 +49,26 @@ import {
 import { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { addTrackedChannel } from "@/services/channelTrackerService"
+import { ChannelAnalysisDialog } from "@/components/ChannelAnalysisDialog"
+
+interface ChannelData {
+  channel_id: string;
+  channel_name: string;
+  channel_handle: string | null;
+  channel_thumbnail: string | null;
+  channel_subscribers: number;
+  videos_fetched?: number;
+  videos?: Array<{
+    id: string;
+    video_id: string;
+    title: string;
+    thumbnail_url: string | null;
+    published_at: string;
+    youtube_url: string | null;
+    view_count: number | null;
+  }>;
+  rss_feed_url?: string;
+}
 
 export function AppSidebar() {
   const location = useLocation()
@@ -59,6 +79,8 @@ export function AppSidebar() {
   const [channelUrl, setChannelUrl] = useState('')
   const [daysPeriod, setDaysPeriod] = useState('7')
   const [isAddingChannel, setIsAddingChannel] = useState(false)
+  const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false)
+  const [analyzedChannelData, setAnalyzedChannelData] = useState<ChannelData | null>(null)
 
   const handleAnalyzeChannel = async () => {
     if (!channelUrl.trim()) return;
@@ -69,16 +91,21 @@ export function AppSidebar() {
       // Use channelTrackerService to add and track the channel (uses RSS - no API quota)
       const result = await addTrackedChannel(channelUrl, parseInt(daysPeriod));
       
-      toast({
-        title: "Channel Added!",
-        description: `Now tracking ${result.channel_name}. ${result.videos_fetched ? `Fetched ${result.videos_fetched} videos.` : ''}`
+      // Store channel data and close the first dialog
+      setAnalyzedChannelData({
+        channel_id: result.channel_id,
+        channel_name: result.channel_name,
+        channel_handle: result.channel_handle || null,
+        channel_thumbnail: result.channel_thumbnail || null,
+        channel_subscribers: result.channel_subscribers,
+        videos_fetched: result.videos_fetched,
+        videos: result.videos,
+        rss_feed_url: result.rss_feed_url
       });
       
       setAddChannelModalOpen(false);
-      // Navigate to competitors page with channelId to show videos from tracked_videos table
-      navigate(`/competitors?channelId=${encodeURIComponent(result.channel_id)}&channelName=${encodeURIComponent(result.channel_name || '')}`);
-      setChannelUrl('');
-      setDaysPeriod('7');
+      // Open the analysis dialog instead of navigating
+      setAnalysisDialogOpen(true);
     } catch (error: any) {
       console.error('Error adding channel:', error);
       toast({
@@ -89,6 +116,15 @@ export function AppSidebar() {
     } finally {
       setIsAddingChannel(false);
     }
+  }
+
+  const handleAnalysisComplete = () => {
+    // Reset form state
+    setChannelUrl('');
+    setDaysPeriod('7');
+    setAnalyzedChannelData(null);
+    // Navigate to ideation page to show the added videos
+    navigate('/');
   }
 
   // Menu items - Reorganized sidebar
@@ -400,6 +436,15 @@ export function AppSidebar() {
           </div>
         </SidebarFooter>
       )}
+
+      {/* Channel Analysis Dialog */}
+      <ChannelAnalysisDialog
+        open={analysisDialogOpen}
+        onOpenChange={setAnalysisDialogOpen}
+        channelData={analyzedChannelData}
+        daysPeriod={parseInt(daysPeriod)}
+        onComplete={handleAnalysisComplete}
+      />
     </Sidebar>
   )
 }

@@ -93,10 +93,29 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Create authenticated Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
     );
+
+    // Get the authenticated user
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return new Response(JSON.stringify({ error: 'Authentication required' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('Authenticated user:', user.id);
 
     const { userScript, scriptAnalysis, dataSource = 'outliers', customAuthority, authorityVsAuthority } = await req.json() as TitleGenerationRequest;
     
@@ -138,14 +157,16 @@ Deno.serve(async (req) => {
     };
 
     // Fetch ALL relevant videos based on data source
+    // Now using user_videos table for the authenticated user's personal collection
     let allRelevantVideos: any[] = [];
     let totalAnalyzedCount = 0;
 
     if (dataSource === 'favorites') {
-      // Query ALL favorite videos (no limit)
+      // Query user's favorite videos from user_videos table
       const { data: favoriteVideos, error: favoriteError } = await supabaseClient
-        .from('videos')
+        .from('user_videos')
         .select('id, title, view_count, channel_subscribers, niche, youtube_url, thumbnail_url, channel_name, upload_date')
+        .eq('user_id', user.id)
         .eq('is_favorite', true)
         .order('view_count', { ascending: false });
 
@@ -158,95 +179,96 @@ Deno.serve(async (req) => {
       }
 
       allRelevantVideos = favoriteVideos || [];
-      console.log(`Found ${allRelevantVideos.length} total favorite videos`);
+      console.log(`Found ${allRelevantVideos.length} favorite videos from user's ideation`);
 
       // If user has very few favorites, suggest using outliers instead
       if (allRelevantVideos.length < 5) {
         return new Response(JSON.stringify({ 
-          error: 'Not enough favorite videos. Please add at least 5 favorites or use the outliers database.' 
+          error: 'Not enough favorite videos in your Ideation. Please add at least 5 favorites or use the Outliers option.' 
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Filter for high-performing videos from ALL favorites
-      const successfulVideos = allRelevantVideos.filter(video => 
-        video.view_count && video.channel_subscribers && 
-        (video.view_count > video.channel_subscribers * 0.1 || video.view_count > 10000)
-      );
-
-      // Set the total analyzed count to ALL favorites that were processed
+      // Set the total analyzed count
       totalAnalyzedCount = allRelevantVideos.length;
-      allRelevantVideos = successfulVideos;
       
-      console.log(`Analyzed ${totalAnalyzedCount} favorite videos, ${allRelevantVideos.length} passed performance filtering`);
+      console.log(`Analyzed ${totalAnalyzedCount} favorite videos from user's ideation`);
     } else {
-      // Use existing outliers logic with limits
-      // Filter by niche if detected
-      if (enhancedScriptAnalysis.niche) {
-        const { data: nicheVideos, error: nicheError } = await supabaseClient
-          .from('videos')
-          .select('id, title, view_count, channel_subscribers, niche, youtube_url, thumbnail_url, channel_name, upload_date')
-          .ilike('niche', `%${enhancedScriptAnalysis.niche}%`)
-          .order('view_count', { ascending: false })
-          .limit(50);
+      // OUTLIERS: Get videos from user's ideation where views > average channel views
+      // First, get all user's videos grouped by channel to calculate averages
+      const { data: userVideos, error: userVideosError } = await supabaseClient
+        .from('user_videos')
+        .select('id, title, view_count, channel_subscribers, channel_name, niche, youtube_url, thumbnail_url, upload_date')
+        .eq('user_id', user.id)
+        .order('view_count', { ascending: false });
 
-        if (!nicheError && nicheVideos) {
-          allRelevantVideos = nicheVideos;
-          console.log(`Found ${allRelevantVideos.length} videos by niche: ${enhancedScriptAnalysis.niche}`);
-        }
+      if (userVideosError) {
+        console.error('Error fetching user videos:', userVideosError);
+        return new Response(JSON.stringify({ error: 'Failed to fetch videos from your ideation' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
-      // Search by keywords in titles if needed
-      if (allRelevantVideos.length < 10 && enhancedScriptAnalysis.keywords.length > 0) {
-        const keywordSearchTerms = enhancedScriptAnalysis.keywords.slice(0, 3);
+      if (!userVideos || userVideos.length === 0) {
+        return new Response(JSON.stringify({ 
+          error: 'No videos found in your Ideation. Please add some videos first.' 
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Calculate average views per channel
+      const channelStats: { [channel: string]: { totalViews: number; count: number } } = {};
+      
+      for (const video of userVideos) {
+        const channelKey = video.channel_name || 'unknown';
+        if (!channelStats[channelKey]) {
+          channelStats[channelKey] = { totalViews: 0, count: 0 };
+        }
+        channelStats[channelKey].totalViews += video.view_count || 0;
+        channelStats[channelKey].count++;
+      }
+
+      // Calculate channel averages
+      const channelAverages: { [channel: string]: number } = {};
+      for (const [channel, stats] of Object.entries(channelStats)) {
+        channelAverages[channel] = stats.count > 0 ? stats.totalViews / stats.count : 0;
+      }
+
+      console.log('Channel averages calculated:', channelAverages);
+
+      // Filter for outliers: videos where view_count > channel average
+      const outlierVideos = userVideos.filter(video => {
+        const channelKey = video.channel_name || 'unknown';
+        const avgViews = channelAverages[channelKey] || 0;
         
-        for (const keyword of keywordSearchTerms) {
-          const { data: keywordVideos, error: keywordError } = await supabaseClient
-            .from('videos')
-            .select('id, title, view_count, channel_subscribers, niche, youtube_url, thumbnail_url, channel_name, upload_date')
-            .ilike('title', `%${keyword}%`)
-            .order('view_count', { ascending: false })
-            .limit(30);
+        // Video is an outlier if views > average views for that channel
+        // Also check if views > subscribers (viral indicator)
+        const isOutlier = video.view_count && (
+          video.view_count > avgViews || 
+          (video.channel_subscribers && video.view_count > video.channel_subscribers)
+        );
+        
+        return isOutlier;
+      });
 
-          if (!keywordError && keywordVideos) {
-            keywordVideos.forEach(video => {
-              if (!allRelevantVideos.find(v => v.id === video.id)) {
-                allRelevantVideos.push(video);
-              }
-            });
-          }
-        }
-        console.log(`After keyword search, found ${allRelevantVideos.length} relevant videos`);
+      console.log(`Found ${outlierVideos.length} outlier videos from ${userVideos.length} total videos`);
+
+      if (outlierVideos.length < 3) {
+        return new Response(JSON.stringify({ 
+          error: 'Not enough outlier videos found. Add more videos to your Ideation or try the Favorites option.' 
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
-      // Fallback: Get top performing videos if insufficient results
-      if (allRelevantVideos.length < 8) {
-        const { data: fallbackVideos, error: fallbackError } = await supabaseClient
-          .from('videos')
-          .select('id, title, view_count, channel_subscribers, niche, youtube_url, thumbnail_url, channel_name, upload_date')
-          .order('view_count', { ascending: false })
-          .limit(30);
-
-        if (!fallbackError && fallbackVideos) {
-          fallbackVideos.forEach(video => {
-            if (!allRelevantVideos.find(v => v.id === video.id)) {
-              allRelevantVideos.push(video);
-            }
-          });
-        }
-        console.log(`After fallback, total videos: ${allRelevantVideos.length}`);
-      }
-
-      // Filter for high-performing videos
-      const successfulVideos = allRelevantVideos.filter(video => 
-        video.view_count && video.channel_subscribers && 
-        (video.view_count > video.channel_subscribers * 0.1 || video.view_count > 10000)
-      );
-
-      totalAnalyzedCount = allRelevantVideos.length;
-      allRelevantVideos = successfulVideos;
+      totalAnalyzedCount = userVideos.length;
+      allRelevantVideos = outlierVideos;
     }
 
     // For pattern analysis, use ALL qualifying videos (not limited to 8)

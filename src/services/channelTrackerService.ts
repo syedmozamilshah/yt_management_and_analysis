@@ -28,26 +28,40 @@ export interface TrackedVideo {
   created_at: string;
 }
 
-export interface ResolveChannelResponse {
+export interface AnalyzedVideo {
+  id: string;
+  video_id: string;
+  title: string;
+  thumbnail_url: string | null;
+  published_at: string;
+  youtube_url: string | null;
+  view_count: number | null;
+}
+
+export interface AnalyzeChannelResponse {
   channel_id: string;
   channel_name: string;
   channel_handle: string | null;
   channel_thumbnail: string | null;
   channel_subscribers: number;
+  videos_fetched: number;
+  videos: AnalyzedVideo[];
   rss_feed_url: string;
-  cached: boolean;
+  days_period: number;
 }
 
 /**
- * Resolve a channel URL to get channel details and save to tracked_channels
+ * Analyze a channel - fetches channel info and videos from RSS (minimal quota usage)
+ * Only uses YouTube API for: 1) resolving handle to channel ID, 2) getting channel info
+ * Videos are fetched from RSS (FREE!)
  */
-export async function resolveChannelId(channelUrl: string): Promise<ResolveChannelResponse> {
-  const { data, error } = await supabase.functions.invoke('resolve-channel-id', {
-    body: { channelUrl }
+export async function analyzeChannel(channelUrl: string, daysPeriod: number = 7): Promise<AnalyzeChannelResponse> {
+  const { data, error } = await supabase.functions.invoke('analyze-channel', {
+    body: { channelUrl, daysPeriod }
   });
 
   if (error) {
-    throw new Error(error.message || 'Failed to resolve channel');
+    throw new Error(error.message || 'Failed to analyze channel');
   }
 
   if (data.error) {
@@ -206,30 +220,41 @@ export async function resubscribeAllChannels(): Promise<{ success: number; faile
 
 /**
  * Add a new channel and subscribe to webhooks
+ * Now uses analyzeChannel for initial setup (minimal quota)
  */
-export async function addTrackedChannel(channelUrl: string, fetchDays: number = 7): Promise<ResolveChannelResponse & { videos_fetched?: number }> {
-  // First resolve the channel
-  const channelData = await resolveChannelId(channelUrl);
+export async function addTrackedChannel(channelUrl: string, fetchDays: number = 7): Promise<AnalyzeChannelResponse> {
+  // Use the new analyze-channel function that returns videos directly
+  const result = await analyzeChannel(channelUrl, fetchDays);
   
-  // Then subscribe to webhooks
-  await subscribeToWebhook(channelData.channel_id);
-  
-  // Fetch historical videos if requested (using RSS - NO QUOTA COST!)
-  let videosFetched = 0;
-  if (fetchDays > 0) {
-    try {
-      const fetchResult = await fetchChannelVideos(channelData.channel_id, channelData.rss_feed_url, fetchDays);
-      videosFetched = fetchResult.videos_inserted;
-    } catch (error) {
-      console.warn('Failed to fetch historical videos:', error);
-      // Don't fail the whole operation if historical fetch fails
-    }
+  // Save channel to tracked_channels for future RSS polling
+  try {
+    await supabase
+      .from('tracked_channels')
+      .upsert({
+        channel_id: result.channel_id,
+        channel_name: result.channel_name,
+        channel_handle: result.channel_handle,
+        channel_thumbnail: result.channel_thumbnail,
+        channel_subscribers: result.channel_subscribers,
+        rss_feed_url: result.rss_feed_url,
+        is_active: true,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'channel_id'
+      });
+  } catch (error) {
+    console.warn('Failed to save tracked channel:', error);
   }
   
-  return {
-    ...channelData,
-    videos_fetched: videosFetched
-  };
+  // Subscribe to webhooks for real-time notifications
+  try {
+    await subscribeToWebhook(result.channel_id);
+  } catch (error) {
+    console.warn('Failed to subscribe to webhook:', error);
+    // Don't fail the whole operation
+  }
+  
+  return result;
 }
 
 /**

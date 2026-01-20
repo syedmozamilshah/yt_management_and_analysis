@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Video } from '@/types/video';
 import { VideoDetailsModal } from './VideoDetailsModal';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface VideoCardProps {
   video: Video;
@@ -26,8 +27,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   blockModalOpen = false
 }) => {
   const { toast } = useToast();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
+  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isUpdatingFavorite, setIsUpdatingFavorite] = useState(false);
 
   const handleClick = () => {
     // Don't open modal if blocked (selection mode)
@@ -38,34 +41,76 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const toggleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
     
+    // Prevent double-clicks
+    if (isUpdatingFavorite) return;
+    setIsUpdatingFavorite(true);
+    
+    const newFavoriteStatus = !video.is_favorite;
+    
     try {
       // Use appropriate table based on user type and video source
       const tableName = (isUserVideo || !isAdmin) ? 'user_videos' : 'videos';
       
+      // Optimistic update - update the cache immediately before the API call
+      if (isUserVideo && user?.id) {
+        queryClient.setQueryData(['user-videos', user.id, 0], (oldData: Video[] | undefined) => {
+          if (!oldData) return oldData;
+          return oldData.map(v => 
+            v.id === video.id ? { ...v, is_favorite: newFavoriteStatus } : v
+          );
+        });
+        
+        // Also update for any refreshTrigger value
+        queryClient.setQueriesData(
+          { queryKey: ['user-videos', user.id] },
+          (oldData: Video[] | undefined) => {
+            if (!oldData) return oldData;
+            return oldData.map(v => 
+              v.id === video.id ? { ...v, is_favorite: newFavoriteStatus } : v
+            );
+          }
+        );
+      }
+      
       const { error } = await (supabase as any)
         .from(tableName)
-        .update({ is_favorite: !video.is_favorite })
+        .update({ is_favorite: newFavoriteStatus })
         .eq('id', video.id);
 
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: video.is_favorite ? "Removed from favorites" : "Added to favorites"
+        description: newFavoriteStatus ? "Added to favorites" : "Removed from favorites"
       });
 
+      // Call the callback if provided (for non-optimistic scenarios)
       if (onFavoriteUpdate) {
         onFavoriteUpdate();
-      } else {
-        window.location.reload();
       }
     } catch (error) {
       console.error('Error updating favorite:', error);
+      
+      // Rollback the optimistic update on error
+      if (isUserVideo && user?.id) {
+        queryClient.setQueriesData(
+          { queryKey: ['user-videos', user.id] },
+          (oldData: Video[] | undefined) => {
+            if (!oldData) return oldData;
+            return oldData.map(v => 
+              v.id === video.id ? { ...v, is_favorite: video.is_favorite } : v
+            );
+          }
+        );
+      }
+      
       toast({
         title: "Error",
         description: "Failed to update favorite status",
         variant: "destructive"
       });
+    } finally {
+      setIsUpdatingFavorite(false);
     }
   };
 

@@ -90,6 +90,7 @@ serve(async (req) => {
     const responseData = {
       title,
       thumbnailUrl,
+      channelId,
       channelName,
       channelSubscribers,
       uploadDate,

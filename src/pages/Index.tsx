@@ -10,13 +10,38 @@ import { AIPromptsSettingsDrawer } from '@/components/AIPromptsSettingsDrawer';
 import { Globe, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [activeTab, setActiveTab] = useState<'videos' | 'title-generator'>('videos');
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAdmin, shouldQueryAllData, adminDataMode } = useAuth();
+  const { isAdmin, shouldQueryAllData, adminDataMode, user } = useAuth();
+
+  // Track user activity when opening ideation page
+  useEffect(() => {
+    const updateUserActivity = async () => {
+      if (!user?.id) return;
+      
+      try {
+        await (supabase as any)
+          .from('user_activity')
+          .upsert({
+            user_id: user.id,
+            last_ideation_opened_at: new Date().toISOString(),
+            is_active: true,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id'
+          });
+      } catch (error) {
+        console.error('Error updating user activity:', error);
+      }
+    };
+
+    updateUserActivity();
+  }, [user?.id]);
 
   // Check URL params for tab selection
   useEffect(() => {

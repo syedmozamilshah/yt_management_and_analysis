@@ -1,7 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { makeYouTubeApiRequest } from "../_shared/youtube-api-keys.ts"
+import { resolveChannelIdWithoutApi } from "../_shared/channel-resolver.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,65 +26,15 @@ serve(async (req) => {
       )
     }
 
-    console.log('Analyzing competitor channel:', channelUrl)
+    console.log('Analyzing competitor channel (QUOTA-FREE):', channelUrl)
 
-    // Extract channel ID from URL
-    let channelId = ''
+    // Use quota-free channel resolution via HTML scraping
+    const channelInfo = await resolveChannelIdWithoutApi(channelUrl)
     
-    if (channelUrl.includes('/channel/')) {
-      channelId = channelUrl.split('/channel/')[1].split('/')[0].split('?')[0]
-      console.log('Extracted channel ID from /channel/ URL:', channelId)
-    } else if (channelUrl.includes('/@')) {
-      const customName = channelUrl.split('/@')[1].split('/')[0].split('?')[0]
-      console.log('Looking for custom channel name:', customName)
-      
-      try {
-        const handleResponse = await makeYouTubeApiRequest(
-          `https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${customName}`
-        )
-        
-        if (handleResponse.ok) {
-          const handleData = await handleResponse.json()
-          console.log('Handle API response:', JSON.stringify(handleData, null, 2))
-          
-          if (handleData.items && handleData.items.length > 0) {
-            channelId = handleData.items[0].id
-            console.log('Found channel ID via handle API:', channelId)
-          }
-        }
-      } catch (error) {
-        console.log('Handle API error:', error.message)
-      }
-      
-      if (!channelId) {
-        try {
-          const searchResponse = await makeYouTubeApiRequest(
-            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(customName)}&maxResults=10`
-          )
-          
-          if (searchResponse.ok) {
-            const searchData = await searchResponse.json()
-            console.log('Search results found:', searchData.items?.length || 0, 'channels')
-            
-            if (searchData.items && searchData.items.length > 0) {
-              const exactMatch = searchData.items.find((item: any) => 
-                item.snippet.customUrl && item.snippet.customUrl.toLowerCase().includes(customName.toLowerCase())
-              ) || searchData.items[0]
-              
-              channelId = exactMatch.id.channelId || exactMatch.snippet.channelId
-              console.log('Found channel ID via search:', channelId)
-            }
-          }
-        } catch (error) {
-          console.log('Search API error:', error.message)
-        }
-      }
-    }
-
-    if (!channelId) {
+    if (!channelInfo) {
       return new Response(
         JSON.stringify({ 
-          error: 'Could not extract channel ID from URL. Please use a valid YouTube channel URL.' 
+          error: 'Could not resolve channel from URL. Please ensure the channel exists and try again.' 
         }),
         { 
           status: 400,
@@ -93,37 +43,11 @@ serve(async (req) => {
       )
     }
 
-    console.log('Using channel ID:', channelId)
+    const channelId = channelInfo.channel_id
+    const channelName = channelInfo.channel_name
+    const subscriberCount = channelInfo.channel_subscribers
 
-    // Get channel details
-    const channelResponse = await makeYouTubeApiRequest(
-      `https://www.googleapis.com/youtube/v3/channels?id=${channelId}&part=snippet,statistics`
-    )
-
-    if (!channelResponse.ok) {
-      console.error('Channel response not ok:', channelResponse.status)
-      throw new Error(`Failed to fetch channel data: ${channelResponse.status}`)
-    }
-
-    const channelData = await channelResponse.json()
-    console.log('Channel data retrieved successfully')
-    
-    if (!channelData.items || channelData.items.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'Channel not found with the provided URL.' }),
-        { 
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
-    const channel = channelData.items[0]
-    const channelName = channel.snippet.title
-    const subscriberCount = parseInt(channel.statistics.subscriberCount || '0')
-    const videoCount = parseInt(channel.statistics.videoCount || '0')
-
-    console.log('Channel found:', channelName, 'Subscribers:', subscriberCount)
+    console.log('Channel resolved (QUOTA-FREE):', channelName, 'Subscribers:', subscriberCount)
 
     // Initialize Supabase client
     const supabaseClient = createClient(
@@ -149,13 +73,14 @@ serve(async (req) => {
     }
 
     // Insert channel into competitor_channels table
+    // Note: video count is not available from RSS, so we estimate from RSS or set to 0
     const { error: insertError } = await supabaseClient
       .from('competitor_channels')
       .insert({
         channel_name: channelName,
         channel_id: channelId,
         channel_subscribers: subscriberCount,
-        total_videos: videoCount
+        total_videos: 0 // Will be updated when videos are fetched via RSS
       })
 
     if (insertError) {
@@ -163,7 +88,7 @@ serve(async (req) => {
       throw insertError
     }
 
-    console.log('Competitor channel added successfully')
+    console.log('Competitor channel added successfully (QUOTA-FREE)')
 
     return new Response(
       JSON.stringify({
@@ -171,7 +96,8 @@ serve(async (req) => {
         channelName,
         channelId,
         subscriberCount,
-        videoCount
+        videoCount: 0, // Not available from quota-free method
+        method: 'quota-free-scraping'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -181,21 +107,9 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error:', error)
     
-    if (error.message.includes('quota') || error.message.includes('API keys')) {
-      return new Response(
-        JSON.stringify({ 
-          error: error.message
-        }),
-        { 
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-    
     return new Response(
       JSON.stringify({ 
-        error: 'Internal server error occurred while analyzing competitor channel. Please try again.', 
+        error: 'Failed to analyze competitor channel. Please check the URL and try again.', 
         details: error.message 
       }),
       { 

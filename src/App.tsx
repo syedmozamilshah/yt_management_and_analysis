@@ -10,7 +10,6 @@ import Admin from "./pages/Admin";
 import AdminStats from "./pages/AdminStats";
 import Home from "./pages/Home";
 import Favorites from "./pages/Favorites";
-import Competitors from "./pages/Competitors";
 import ChannelTrackerPage from "./pages/ChannelTracker";
 import Tools from "./pages/Tools";
 import Auth from "./pages/Auth";
@@ -51,7 +50,6 @@ const App = () => (
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
             <Route path="/favorites" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
-            <Route path="/competitors" element={<ProtectedRoute><Competitors /></ProtectedRoute>} />
             <Route path="/channel-tracker" element={<ProtectedRoute><ChannelTrackerPage /></ProtectedRoute>} />
             <Route path="/tools" element={<ProtectedRoute><Tools /></ProtectedRoute>} />
             
