@@ -714,7 +714,7 @@ const Tools = () => {
             </SidebarContent>
 
             <SidebarFooter className="border-t border-[#272727] p-4">
-              <p className="text-xs text-[#666666]">Video Stash AI Tools</p>
+              <p className="text-xs text-[#666666]">Blowmeai AI Tools</p>
             </SidebarFooter>
           </Sidebar>
 

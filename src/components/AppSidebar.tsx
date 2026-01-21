@@ -208,12 +208,11 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel className="text-lg font-bold mb-4 px-2 flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-[#cc0000]" />
-            Video Stash
+            Blowmeai
           </SidebarGroupLabel>
-          {/* Add Competitor Button - Top of sidebar */}
-          {!isAdmin && (
-            <div className="px-2 mb-3">
-              <Dialog open={addChannelModalOpen} onOpenChange={setAddChannelModalOpen}>
+          {/* Add Channel Button - Top of sidebar */}
+          <div className="px-2 mb-3">
+            <Dialog open={addChannelModalOpen} onOpenChange={setAddChannelModalOpen}>
                 <DialogTrigger asChild>
                   <Button
                     className="w-full bg-[#cc0000] hover:bg-[#aa0000] text-white flex items-center gap-2"
@@ -271,9 +270,8 @@ export function AppSidebar() {
                     </Button>
                   </div>
                 </DialogContent>
-              </Dialog>
-            </div>
-          )}
+            </Dialog>
+          </div>
           <SidebarGroupContent>
             <SidebarMenu>
               {/* Main Menu Items */}
@@ -359,15 +357,15 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton 
-                      isActive={location.pathname === '/admin'}
+                      isActive={location.pathname === '/admin/users'}
                       className={`hover:bg-sidebar-accent transition-colors cursor-pointer ${
-                        location.pathname === '/admin' ? 'bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90' : ''
+                        location.pathname === '/admin/users' ? 'bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90' : ''
                       }`}
-                      onClick={() => handleNavigation('/admin')}
+                      onClick={() => handleNavigation('/admin/users')}
                     >
                       <div className="flex items-center gap-3 w-full">
-                        <Settings className="w-5 h-5" />
-                        <span>Admin Portal</span>
+                        <Users className="w-5 h-5" />
+                        <span>Users</span>
                       </div>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

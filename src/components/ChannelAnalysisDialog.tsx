@@ -12,7 +12,9 @@ import {
   Plus, 
   Loader2, 
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  Globe,
+  User
 } from 'lucide-react';
 import { formatNumber } from '@/utils/formatNumbers';
 import { NicheCombobox } from '@/components/NicheCombobox';
@@ -61,11 +63,12 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
   daysPeriod,
   onComplete
 }) => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [niche, setNiche] = useState('');
   const [isAddingVideos, setIsAddingVideos] = useState(false);
+  const [addingMode, setAddingMode] = useState<'personal' | 'global' | null>(null);
 
   // Use videos from channelData directly (fetched via RSS)
   const videos = channelData?.videos || [];
@@ -77,10 +80,11 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
     if (!open) {
       setNiche('');
       setIsAddingVideos(false);
+      setAddingMode(null);
     }
   }, [open]);
 
-  const handleAddVideos = async () => {
+  const handleAddVideos = async (mode: 'personal' | 'global' = 'personal') => {
     if (!user?.id || !channelData || !niche.trim()) {
       toast({
         title: "Error",
@@ -100,6 +104,7 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
     }
 
     setIsAddingVideos(true);
+    setAddingMode(mode);
 
     try {
       // First, fetch view counts from YouTube API (1 quota unit per 50 videos)
@@ -124,59 +129,102 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
         console.warn('View count fetch failed, videos will show 0 views initially:', e);
       }
 
-      // Prepare videos for insertion into user_videos
-      const videosToInsert = videos.map(video => ({
-        user_id: user.id,
-        title: video.title,
-        youtube_url: video.youtube_url || `https://www.youtube.com/watch?v=${video.video_id}`,
-        video_id: video.video_id,
-        thumbnail_url: video.thumbnail_url || `https://i.ytimg.com/vi/${video.video_id}/hqdefault.jpg`,
-        channel_name: channelData.channel_name,
-        channel_id: channelData.channel_id, // Save channel_id for auto-sync
-        channel_subscribers: channelData.channel_subscribers,
-        upload_date: video.published_at,
-        view_count: viewCountsMap[video.video_id] ?? video.view_count ?? 0,
-        niche: niche.trim()
-      }));
-
-      const { error } = await (supabase as any)
-        .from('user_videos')
-        .insert(videosToInsert);
-
-      if (error) throw error;
-
-      // Save the channel-niche subscription for auto-syncing future videos
-      await (supabase as any)
-        .from('user_channel_subscriptions')
-        .upsert({
-          user_id: user.id,
+      if (mode === 'global' && isAdmin) {
+        // Admin adding for all users - add to the global 'videos' table
+        const videosToInsert = videos.map(video => ({
+          title: video.title,
+          youtube_url: video.youtube_url || `https://www.youtube.com/watch?v=${video.video_id}`,
+          video_id: video.video_id,
+          thumbnail_url: video.thumbnail_url || `https://i.ytimg.com/vi/${video.video_id}/hqdefault.jpg`,
+          channel_name: channelData.channel_name,
           channel_id: channelData.channel_id,
-          niche: niche.trim(),
-          is_active: true,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,channel_id'
-        });
+          channel_subscribers: channelData.channel_subscribers,
+          upload_date: video.published_at,
+          view_count: viewCountsMap[video.video_id] ?? video.view_count ?? 0,
+          niche: niche.trim()
+        }));
 
-      // Update user activity to mark them as active
-      await (supabase as any)
-        .from('user_activity')
-        .upsert({
+        const { error } = await supabase
+          .from('videos')
+          .insert(videosToInsert);
+
+        if (error) throw error;
+
+        // Also create a global channel subscription so new videos are auto-added
+        await (supabase as any)
+          .from('admin_channel_subscriptions')
+          .upsert({
+            channel_id: channelData.channel_id,
+            channel_name: channelData.channel_name,
+            niche: niche.trim(),
+            is_active: true,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'channel_id'
+          });
+
+        // Invalidate the videos query to refresh
+        queryClient.invalidateQueries({ queryKey: ['videos'] });
+
+        toast({
+          title: "✅ Videos Added for All Users!",
+          description: `Successfully added ${videos.length} video${videos.length > 1 ? 's' : ''} visible to all users. Future videos from this channel will be auto-added.`
+        });
+      } else {
+        // Regular user or admin personal mode - add to user_videos
+        const videosToInsert = videos.map(video => ({
           user_id: user.id,
-          last_ideation_opened_at: new Date().toISOString(),
-          is_active: true,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id'
+          title: video.title,
+          youtube_url: video.youtube_url || `https://www.youtube.com/watch?v=${video.video_id}`,
+          video_id: video.video_id,
+          thumbnail_url: video.thumbnail_url || `https://i.ytimg.com/vi/${video.video_id}/hqdefault.jpg`,
+          channel_name: channelData.channel_name,
+          channel_id: channelData.channel_id,
+          channel_subscribers: channelData.channel_subscribers,
+          upload_date: video.published_at,
+          view_count: viewCountsMap[video.video_id] ?? video.view_count ?? 0,
+          niche: niche.trim()
+        }));
+
+        const { error } = await (supabase as any)
+          .from('user_videos')
+          .insert(videosToInsert);
+
+        if (error) throw error;
+
+        // Save the channel-niche subscription for auto-syncing future videos
+        await (supabase as any)
+          .from('user_channel_subscriptions')
+          .upsert({
+            user_id: user.id,
+            channel_id: channelData.channel_id,
+            niche: niche.trim(),
+            is_active: true,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id,channel_id'
+          });
+
+        // Update user activity to mark them as active
+        await (supabase as any)
+          .from('user_activity')
+          .upsert({
+            user_id: user.id,
+            last_ideation_opened_at: new Date().toISOString(),
+            is_active: true,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id'
+          });
+
+        // Invalidate queries to refresh the ideation page
+        queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
+
+        toast({
+          title: "✅ Videos Added!",
+          description: `Successfully added ${videos.length} video${videos.length > 1 ? 's' : ''} to your ideation board. Future videos from this channel will be auto-added.`
         });
-
-      // Invalidate queries to refresh the ideation page
-      queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
-
-      toast({
-        title: "✅ Videos Added!",
-        description: `Successfully added ${videos.length} video${videos.length > 1 ? 's' : ''} to your ideation board. Future videos from this channel will be auto-added.`
-      });
+      }
 
       onOpenChange(false);
       onComplete();
@@ -299,27 +347,70 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
             />
           </div>
 
-          {/* Add Videos Button */}
-          <Button
-            onClick={handleAddVideos}
-            disabled={!niche.trim() || isAddingVideos || videoCount === 0 || isLoadingVideos}
-            className="w-full h-12 bg-gradient-to-r from-[#cc0000] to-[#aa0000] hover:from-[#dd0000] hover:to-[#bb0000] text-white font-semibold rounded-xl shadow-lg shadow-[#cc0000]/30 disabled:opacity-50"
-          >
-            {isAddingVideos ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Adding Videos...
-              </>
-            ) : (
-              <>
-                <Plus className="w-4 h-4 mr-2" />
-                Add {videoCount} Video{videoCount !== 1 ? 's' : ''} to Ideation
-              </>
-            )}
-          </Button>
+          {/* Add Videos Buttons */}
+          {isAdmin ? (
+            <div className="space-y-3">
+              <Button
+                onClick={() => handleAddVideos('global')}
+                disabled={!niche.trim() || isAddingVideos || videoCount === 0 || isLoadingVideos}
+                className="w-full h-12 bg-gradient-to-r from-[#cc0000] to-[#aa0000] hover:from-[#dd0000] hover:to-[#bb0000] text-white font-semibold rounded-xl shadow-lg shadow-[#cc0000]/30 disabled:opacity-50"
+              >
+                {isAddingVideos && addingMode === 'global' ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Adding for All Users...
+                  </>
+                ) : (
+                  <>
+                    <Globe className="w-4 h-4 mr-2" />
+                    Add for All Users ({videoCount} Videos)
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={() => handleAddVideos('personal')}
+                disabled={!niche.trim() || isAddingVideos || videoCount === 0 || isLoadingVideos}
+                variant="outline"
+                className="w-full h-12 border-[#404040] text-[#f1f1f1] hover:bg-[#272727] font-semibold rounded-xl disabled:opacity-50"
+              >
+                {isAddingVideos && addingMode === 'personal' ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Adding to Your Ideation...
+                  </>
+                ) : (
+                  <>
+                    <User className="w-4 h-4 mr-2" />
+                    Add to Your Ideation Only
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : (
+            <Button
+              onClick={() => handleAddVideos('personal')}
+              disabled={!niche.trim() || isAddingVideos || videoCount === 0 || isLoadingVideos}
+              className="w-full h-12 bg-gradient-to-r from-[#cc0000] to-[#aa0000] hover:from-[#dd0000] hover:to-[#bb0000] text-white font-semibold rounded-xl shadow-lg shadow-[#cc0000]/30 disabled:opacity-50"
+            >
+              {isAddingVideos ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Adding Videos...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add {videoCount} Video{videoCount !== 1 ? 's' : ''} to Ideation
+                </>
+              )}
+            </Button>
+          )}
 
           <p className="text-xs text-[#666666] text-center">
-            Videos will be added to your Ideation page with the selected niche
+            {isAdmin 
+              ? "Add for all users to make videos visible globally, or add to your personal ideation board."
+              : "Videos will be added to your Ideation page with the selected niche"
+            }
           </p>
         </div>
       </DialogContent>

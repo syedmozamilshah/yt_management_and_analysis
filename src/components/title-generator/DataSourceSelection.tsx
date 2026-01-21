@@ -117,6 +117,7 @@ export const DataSourceSelection: React.FC<DataSourceSelectionProps> = ({
   };
 
   const canUseFavorites = favoritesCount >= 5;
+  const canUseOutliers = outliersCount >= 5;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -134,18 +135,22 @@ export const DataSourceSelection: React.FC<DataSourceSelectionProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Outliers Database Option */}
             <div
-              className={`p-6 rounded-xl border-2 cursor-pointer transition-all duration-300 ${
-                selectedSource === 'outliers'
-                  ? 'border-[#cc0000] bg-[#cc0000]/10'
-                  : 'border-[#3f3f3f] bg-[#272727] hover:border-[#cc0000]/50'
+              className={`p-6 rounded-xl border-2 transition-all duration-300 ${
+                !canUseOutliers
+                  ? 'border-[#3f3f3f] bg-[#272727] opacity-60 cursor-not-allowed'
+                  : selectedSource === 'outliers'
+                  ? 'border-[#cc0000] bg-[#cc0000]/10 cursor-pointer'
+                  : 'border-[#3f3f3f] bg-[#272727] hover:border-[#cc0000]/50 cursor-pointer'
               }`}
-              onClick={() => onSourceSelect('outliers')}
+              onClick={() => canUseOutliers && onSourceSelect('outliers')}
             >
               <div className="flex items-center justify-between mb-4">
                 <TrendingUp className="w-8 h-8 text-[#cc0000]" />
-                <Badge className="bg-[#cc0000]/20 text-[#cc0000] border-[#cc0000]/30">
-                  Recommended
-                </Badge>
+                {canUseOutliers && (
+                  <Badge className="bg-[#cc0000]/20 text-[#cc0000] border-[#cc0000]/30">
+                    Recommended
+                  </Badge>
+                )}
               </div>
               <h3 className="text-xl font-bold text-[#f1f1f1] mb-2">
                 Outliers Database
@@ -162,12 +167,25 @@ export const DataSourceSelection: React.FC<DataSourceSelectionProps> = ({
                   {loading ? '...' : outliersCount.toLocaleString()} outlier videos
                 </span>
               </div>
-              <div className="text-[#cc0000] text-sm">
-                ✓ Proven viral patterns
-              </div>
-              <div className="text-[#cc0000] text-sm">
-                ✓ Cross-niche insights
-              </div>
+              {canUseOutliers ? (
+                <>
+                  <div className="text-[#cc0000] text-sm">
+                    ✓ Proven viral patterns
+                  </div>
+                  <div className="text-[#cc0000] text-sm">
+                    ✓ Cross-niche insights
+                  </div>
+                </>
+              ) : (
+                <div className="bg-[#cc0000]/20 rounded-lg p-3 mt-3">
+                  <div className="text-[#cc0000] text-sm font-medium mb-1">
+                    Need at least 5 outliers
+                  </div>
+                  <div className="text-[#cc0000] text-xs">
+                    Add more videos to your collection to use this option
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Favorites Option */}

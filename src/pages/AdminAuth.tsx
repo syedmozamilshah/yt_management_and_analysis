@@ -13,24 +13,33 @@ const AdminAuth = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [hasShownAccessDenied, setHasShownAccessDenied] = useState(false);
   const { toast } = useToast();
-  const { signIn, user, isAdmin, loading: authLoading } = useAuth();
+  const { signIn, signOut, user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Only act after auth loading is complete
+    if (authLoading) return;
+    
     // Redirect if already logged in as admin
-    if (!authLoading && user && isAdmin) {
+    if (user && isAdmin) {
       navigate('/admin/dashboard');
+      return;
     }
-    // If logged in but not admin, sign them out and stay here
-    if (!authLoading && user && !isAdmin) {
+    
+    // If logged in but not admin, show warning once and sign them out
+    if (user && !isAdmin && !hasShownAccessDenied) {
+      setHasShownAccessDenied(true);
       toast({
         title: "Access Denied",
-        description: "This login is for admin only.",
+        description: "This login is for admin only. Please sign out first.",
         variant: "destructive"
       });
+      // Sign out the non-admin user so they can try again
+      signOut();
     }
-  }, [user, isAdmin, authLoading, navigate]);
+  }, [user, isAdmin, authLoading, navigate, hasShownAccessDenied]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +56,10 @@ const AdminAuth = () => {
     setLoading(true);
 
     try {
-      const { error, isAdmin: isAdminUser } = await signIn(email, password);
+      console.log('Admin login attempt with email:', email.trim());
+      const { error, isAdmin: isAdminUser } = await signIn(email.trim(), password);
+      console.log('Sign in result:', { error, isAdminUser });
+      
       if (error) {
         toast({
           title: "Error",
@@ -62,6 +74,8 @@ const AdminAuth = () => {
           });
           navigate('/admin/dashboard');
         } else {
+          // Sign out non-admin users who try to login here
+          await signOut();
           toast({
             title: "Access Denied",
             description: "This login is for admin only. Please use the regular sign-in.",

@@ -13,7 +13,7 @@ const Auth = () => {
   const [step, setStep] = useState<'email' | 'otp'>('email');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { user, isAdmin, loading: authLoading } = useAuth();
+  const { user, isAdmin, loading: authLoading, userStatus } = useAuth();
   const navigate = useNavigate();
 
   // Feature highlights
@@ -26,13 +26,18 @@ const Auth = () => {
 
   useEffect(() => {
     if (!authLoading && user) {
+      // Check user status for non-admin users
       if (isAdmin) {
         navigate('/admin/dashboard');
-      } else {
+      } else if (userStatus === 'pending') {
+        navigate('/pending-approval');
+      } else if (userStatus === 'blocked') {
+        navigate('/blocked');
+      } else if (userStatus === 'approved') {
         navigate('/');
       }
     }
-  }, [user, isAdmin, authLoading, navigate]);
+  }, [user, isAdmin, authLoading, userStatus, navigate]);
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +52,7 @@ const Auth = () => {
     }
 
     // Check if it's admin email
-    if (email.toLowerCase() === 'admin@videostash.com') {
+    if (email.toLowerCase() === 'admin@blowmeai.com') {
       toast({
         title: "Admin Account",
         description: "Please use the admin login at /admin-login",
@@ -103,24 +108,67 @@ const Auth = () => {
     setLoading(true);
 
     try {
+      console.log('Verifying OTP for:', email.trim());
       const { data, error } = await supabase.auth.verifyOtp({
         email: email.trim(),
         token: otp.trim(),
         type: 'email'
       });
 
+      console.log('OTP verification result:', { data, error });
+
       if (error) {
+        console.error('OTP verification error:', error);
         toast({
           title: "Invalid Code",
           description: "The code you entered is incorrect or expired. Please try again.",
           variant: "destructive"
         });
       } else if (data.user) {
-        toast({
-          title: "Welcome! 🎉",
-          description: "You're now signed in."
-        });
-        navigate('/');
+        console.log('User authenticated:', data.user.id);
+        
+        // Check if this is a new user (will be pending) or existing approved user
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('user_status')
+            .eq('id', data.user.id)
+            .single();
+          
+          console.log('Profile check result:', { profile, profileError });
+          
+          // If profile doesn't exist or error, treat as approved (for users before the migration)
+          const status = profile?.user_status || 'approved';
+          
+          if (status === 'pending') {
+            toast({
+              title: "Account Created! ✅",
+              description: "Your account is pending admin approval."
+            });
+            navigate('/pending-approval');
+          } else if (status === 'blocked') {
+            toast({
+              title: "Account Blocked",
+              description: "Your account has been blocked. Please contact admin.",
+              variant: "destructive"
+            });
+            await supabase.auth.signOut();
+          } else {
+            toast({
+              title: "Welcome! 🎉",
+              description: "You're now signed in."
+            });
+            navigate('/');
+          }
+        } catch (profileCheckError) {
+          console.error('Profile check error:', profileCheckError);
+          // If we can't check profile, let them in (backwards compatibility)
+          toast({
+            title: "Welcome! 🎉",
+            description: "You're now signed in."
+          });
+          navigate('/');
+        }
       }
     } catch (error) {
       toast({
@@ -185,7 +233,7 @@ const Auth = () => {
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#cc0000] to-[#aa0000] flex items-center justify-center shadow-lg shadow-red-900/30">
               <TrendingUp className="w-6 h-6 text-white" />
             </div>
-            <span className="text-2xl font-bold text-[#f1f1f1]">Video Stash</span>
+            <span className="text-2xl font-bold text-[#f1f1f1]">Blowmeai</span>
           </div>
           
           <h1 className="text-4xl lg:text-5xl font-bold text-[#f1f1f1] leading-tight mb-6">
@@ -223,7 +271,7 @@ const Auth = () => {
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#cc0000] to-[#aa0000] flex items-center justify-center shadow-lg shadow-red-900/30">
               <TrendingUp className="w-6 h-6 text-white" />
             </div>
-            <span className="text-2xl font-bold text-[#f1f1f1]">Video Stash</span>
+            <span className="text-2xl font-bold text-[#f1f1f1]">Blowmeai</span>
           </div>
 
           {step === 'email' ? (

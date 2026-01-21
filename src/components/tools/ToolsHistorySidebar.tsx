@@ -245,7 +245,7 @@ const ToolsHistorySidebar = ({
 
         {/* Footer */}
         <div className="border-t border-[#272727] p-4 text-xs text-[#666666]">
-          <p>Video Stash Tools v1.0</p>
+          <p>Blowmeai Tools v1.0</p>
         </div>
       </aside>
 

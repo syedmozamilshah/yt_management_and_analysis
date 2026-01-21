@@ -8,6 +8,7 @@ import AdminAddVideo from './AdminAddVideo';
 import ChannelAnalysisSection from './sections/ChannelAnalysisSection';
 import ProvenNichesSection from './sections/ProvenNichesSection';
 import UserAnalyticsSection from './sections/UserAnalyticsSection';
+import UserManagement from './UserManagement';
 
 const AdminDashboard = () => {
   console.log('AdminDashboard rendered');
@@ -24,6 +25,8 @@ const AdminDashboard = () => {
         return <ProvenNichesSection />;
       case 'user-analytics':
         return <UserAnalyticsSection />;
+      case 'user-management':
+        return <UserManagement />;
       case 'video-management':
       default:
         return <AdminVideoManagement />;

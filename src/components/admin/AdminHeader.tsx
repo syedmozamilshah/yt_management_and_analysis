@@ -2,7 +2,7 @@
 import React from 'react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { FileText, Plus, Video, Users, Target, BarChart3 } from 'lucide-react';
+import { FileText, Plus, Video, Users, Target, BarChart3, UserCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface AdminHeaderProps {
@@ -94,6 +94,18 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ activeSection, setActiveSecti
             }`}
           >
             <BarChart3 className="w-4 h-4" />
+            User Analytics
+          </Button>
+          <Button
+            onClick={() => setActiveSection('user-management')}
+            variant={activeSection === 'user-management' ? 'default' : 'ghost'}
+            className={`flex items-center gap-2 ${
+              activeSection === 'user-management' 
+                ? 'bg-[#cc0000] text-white hover:bg-[#aa0000]' 
+                : 'text-[#aaaaaa] hover:text-white hover:bg-[#272727]'
+            }`}
+          >
+            <UserCheck className="w-4 h-4" />
             Users
           </Button>
         </div>

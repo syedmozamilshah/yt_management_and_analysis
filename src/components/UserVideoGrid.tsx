@@ -40,10 +40,15 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch user's personal videos
-  const { data: videos = [], isLoading, refetch } = useQuery({
+  const { data: videos = [], isLoading, refetch, error: queryError } = useQuery({
     queryKey: ['user-videos', user?.id, refreshTrigger],
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!user?.id) {
+        console.log('UserVideoGrid: No user ID, returning empty array');
+        return [];
+      }
+      
+      console.log('UserVideoGrid: Fetching videos for user:', user.id);
       
       const { data, error } = await (supabase as any)
         .from('user_videos')
@@ -60,6 +65,8 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
         });
         return [];
       }
+
+      console.log('UserVideoGrid: Fetched', data?.length || 0, 'videos');
 
       // Transform user_videos to Video format
       return (data || []).map((uv: any) => ({
@@ -81,6 +88,16 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
     staleTime: 0, // Always consider data stale
     refetchOnMount: 'always', // Always refetch when component mounts (navigation)
   });
+
+  // Debug logging
+  React.useEffect(() => {
+    console.log('UserVideoGrid state:', { 
+      userId: user?.id, 
+      isLoading, 
+      videosCount: videos.length,
+      queryError 
+    });
+  }, [user?.id, isLoading, videos.length, queryError]);
 
   // Update filters when data changes
   React.useEffect(() => {
@@ -230,17 +247,13 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[#272727] mb-6">
             <Sparkles className="w-10 h-10 text-[#aaaaaa]" />
           </div>
-          <h3 className="text-2xl font-bold text-[#f1f1f1] mb-3">Your Collection is Empty</h3>
-          <p className="text-[#aaaaaa] text-lg mb-6 max-w-md mx-auto">
-            Start building your personal video database. Add YouTube videos to track and analyze.
+          <h3 className="text-2xl font-bold text-[#f1f1f1] mb-3">Start Tracking Your Competitors</h3>
+          <p className="text-[#aaaaaa] text-lg mb-4 max-w-md mx-auto">
+            Add your competitor channels to start seeing how they're doing.
           </p>
-          <Button 
-            onClick={() => navigate('/home')}
-            className="bg-[#cc0000] hover:bg-[#aa0000] text-white text-lg px-8 py-3"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Add Your First Video
-          </Button>
+          <p className="text-[#888888] text-base max-w-md mx-auto">
+            Click the <span className="text-[#cc0000] font-semibold">"Add Channel"</span> button in the sidebar to get started.
+          </p>
         </div>
       </div>
     );

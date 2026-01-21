@@ -223,6 +223,12 @@ export async function resubscribeAllChannels(): Promise<{ success: number; faile
  * Now uses analyzeChannel for initial setup (minimal quota)
  */
 export async function addTrackedChannel(channelUrl: string, fetchDays: number = 7): Promise<AnalyzeChannelResponse> {
+  // Get current user
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+
   // Use the new analyze-channel function that returns videos directly
   const result = await analyzeChannel(channelUrl, fetchDays);
   
@@ -231,6 +237,7 @@ export async function addTrackedChannel(channelUrl: string, fetchDays: number = 
     await supabase
       .from('tracked_channels')
       .upsert({
+        user_id: user.id,
         channel_id: result.channel_id,
         channel_name: result.channel_name,
         channel_handle: result.channel_handle,
@@ -240,7 +247,7 @@ export async function addTrackedChannel(channelUrl: string, fetchDays: number = 
         is_active: true,
         updated_at: new Date().toISOString()
       }, {
-        onConflict: 'channel_id'
+        onConflict: 'user_id,channel_id'
       });
   } catch (error) {
     console.warn('Failed to save tracked channel:', error);

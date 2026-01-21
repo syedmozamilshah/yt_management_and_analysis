@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import Admin from "./pages/Admin";
 import AdminStats from "./pages/AdminStats";
+import AdminUsers from "./pages/AdminUsers";
 import Home from "./pages/Home";
 import Favorites from "./pages/Favorites";
 import ChannelTrackerPage from "./pages/ChannelTracker";
@@ -15,6 +16,8 @@ import Tools from "./pages/Tools";
 import Auth from "./pages/Auth";
 import AdminAuth from "./pages/AdminAuth";
 import NotFound from "./pages/NotFound";
+import PendingApproval from "./pages/PendingApproval";
+import BlockedAccount from "./pages/BlockedAccount";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 
@@ -45,6 +48,8 @@ const App = () => (
           <Routes>
             {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
+            <Route path="/pending-approval" element={<PendingApproval />} />
+            <Route path="/blocked" element={<BlockedAccount />} />
             
             {/* Protected routes for authenticated users */}
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
@@ -58,6 +63,7 @@ const App = () => (
             
             {/* Admin only routes - protected dashboard */}
             <Route path="/admin/dashboard" element={<AdminRoute><Admin /></AdminRoute>} />
+            <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
             <Route path="/admin-stats" element={<AdminRoute><AdminStats /></AdminRoute>} />
             
             <Route path="*" element={<NotFound />} />

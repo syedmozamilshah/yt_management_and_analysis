@@ -6,7 +6,7 @@ import { AllUsersVideoGrid } from '@/components/AllUsersVideoGrid';
 import { TitleGeneratorSection } from '@/components/TitleGeneratorSection';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
-import { AIPromptsSettingsDrawer } from '@/components/AIPromptsSettingsDrawer';
+import { TrackedChannelsDrawer } from '@/components/TrackedChannelsDrawer';
 import { Globe, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -101,7 +101,7 @@ const Index = () => {
                         </div>
                       )}
                     </div>
-                    <AIPromptsSettingsDrawer />
+                    <TrackedChannelsDrawer />
                   </div>
                 </div>
               </div>
