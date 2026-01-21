@@ -50,39 +50,61 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
       
       console.log('UserVideoGrid: Fetching videos for user:', user.id);
       
-      const { data, error } = await (supabase as any)
-        .from('user_videos')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching user videos:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load your videos",
-          variant: "destructive"
+      try {
+        // Add timeout wrapper to detect hanging queries
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Query timeout after 15s')), 15000);
         });
+        
+        const queryPromise = supabase
+          .from('user_videos')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        const result = await Promise.race([queryPromise, timeoutPromise]) as any;
+        const { data, error } = result;
+
+        console.log('UserVideoGrid: Query completed', { dataLength: data?.length, error });
+
+        if (error) {
+          console.error('Error fetching user videos:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load your videos",
+            variant: "destructive"
+          });
+          return [];
+        }
+
+        console.log('UserVideoGrid: Fetched', data?.length || 0, 'videos');
+
+        // Transform user_videos to Video format
+        return (data || []).map((uv: any) => ({
+          id: uv.id,
+          title: uv.title,
+          youtube_url: uv.youtube_url,
+          video_id: uv.video_id,
+          thumbnail_url: uv.thumbnail_url,
+          channel_name: uv.channel_name,
+          channel_subscribers: uv.channel_subscribers,
+          upload_date: uv.upload_date,
+          view_count: uv.view_count,
+          niche: uv.niche,
+          is_favorite: uv.is_favorite,
+          created_at: uv.created_at,
+        })) as Video[];
+      } catch (e: any) {
+        console.error('UserVideoGrid: Exception during fetch:', e?.message || e);
+        if (e?.message?.includes('timeout')) {
+          toast({
+            title: "Query Timeout",
+            description: "Database query is taking too long. Please refresh.",
+            variant: "destructive"
+          });
+        }
         return [];
       }
-
-      console.log('UserVideoGrid: Fetched', data?.length || 0, 'videos');
-
-      // Transform user_videos to Video format
-      return (data || []).map((uv: any) => ({
-        id: uv.id,
-        title: uv.title,
-        youtube_url: uv.youtube_url,
-        video_id: uv.video_id,
-        thumbnail_url: uv.thumbnail_url,
-        channel_name: uv.channel_name,
-        channel_subscribers: uv.channel_subscribers,
-        upload_date: uv.upload_date,
-        view_count: uv.view_count,
-        niche: uv.niche,
-        is_favorite: uv.is_favorite,
-        created_at: uv.created_at,
-      })) as Video[];
     },
     enabled: !!user?.id,
     staleTime: 0, // Always consider data stale
