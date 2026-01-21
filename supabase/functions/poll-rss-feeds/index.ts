@@ -90,7 +90,7 @@ async function fetchViewCountsBatch(videoIds: string[]): Promise<Map<string, num
         continue
       }
       
-      const data = await response.json()
+      const data = await response.json() as { items?: Array<{ id: string; statistics?: { viewCount?: string } }> }
       
       if (data.items) {
         for (const item of data.items) {
@@ -286,7 +286,7 @@ serve(async (req: Request) => {
       for (const video of videos) {
         const viewCount = viewCounts.get(video.videoId) || null
 
-        // Insert new video with view count
+        // Insert new video with view count and channel_name
         const { error: insertError } = await supabase
           .from('tracked_videos')
           .insert({
@@ -297,7 +297,8 @@ serve(async (req: Request) => {
             youtube_url: video.youtubeUrl,
             published_at: video.publishedAt,
             view_count: viewCount,
-            source: 'rss_poll'
+            source: 'rss_poll',
+            channel_name: video.channelName // Include channel name from tracked_channels
           })
 
         if (insertError) {
