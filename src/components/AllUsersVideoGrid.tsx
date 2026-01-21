@@ -75,6 +75,40 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
     refetchOnMount: 'always', // Always refetch when component mounts (navigation)
   });
 
+  // Poll for new videos every 30 seconds while page is open (admin view)
+  React.useEffect(() => {
+    const pollForNewVideos = async () => {
+      try {
+        console.log('Admin: Polling RSS feeds for new videos...');
+        // Trigger server-side RSS polling
+        const { error } = await supabase.functions.invoke('poll-rss-feeds', {
+          body: {}
+        });
+        
+        if (error) {
+          console.error('Error polling RSS feeds:', error);
+          return;
+        }
+        
+        // Refetch to show any new videos
+        refetch();
+      } catch (err) {
+        console.error('Failed to poll for new videos:', err);
+      }
+    };
+
+    // Initial poll after 5 seconds
+    const initialPoll = setTimeout(pollForNewVideos, 5000);
+    
+    // Then poll every 30 seconds
+    const pollInterval = setInterval(pollForNewVideos, 30000);
+
+    return () => {
+      clearTimeout(initialPoll);
+      clearInterval(pollInterval);
+    };
+  }, [refetch]);
+
   // Update filters when data changes
   React.useEffect(() => {
     if (videos && videos.length > 0) {

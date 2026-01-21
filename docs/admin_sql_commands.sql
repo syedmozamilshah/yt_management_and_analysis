@@ -1,11 +1,12 @@
 -- ============================================
 -- SQL Commands for Supabase SQL Editor
 -- Make all users except admin pending
+-- NOTE: The column is "user_status" not "status"
 -- ============================================
 
 -- 1. Make ALL users except admin pending
 UPDATE public.profiles
-SET status = 'pending'
+SET user_status = 'pending'
 WHERE id NOT IN (
   SELECT id FROM auth.users WHERE email = 'admin@blowmeai.com'
 );
@@ -14,7 +15,7 @@ WHERE id NOT IN (
 SELECT 
   p.id,
   u.email,
-  p.status,
+  p.user_status,
   p.created_at
 FROM public.profiles p
 JOIN auth.users u ON u.id = p.id
@@ -26,59 +27,59 @@ ORDER BY p.created_at DESC;
 
 -- 3. Make a specific user approved by email
 -- UPDATE public.profiles
--- SET status = 'approved'
+-- SET user_status = 'approved'
 -- WHERE id = (SELECT id FROM auth.users WHERE email = 'user@example.com');
 
 -- 4. Block a specific user by email
 -- UPDATE public.profiles
--- SET status = 'blocked'
+-- SET user_status = 'blocked'
 -- WHERE id = (SELECT id FROM auth.users WHERE email = 'user@example.com');
 
 -- 5. Get all pending users
 SELECT 
   p.id,
   u.email,
-  p.status,
+  p.user_status,
   p.created_at
 FROM public.profiles p
 JOIN auth.users u ON u.id = p.id
-WHERE p.status = 'pending'
+WHERE p.user_status = 'pending'
 ORDER BY p.created_at DESC;
 
 -- 6. Get all approved users
 SELECT 
   p.id,
   u.email,
-  p.status,
+  p.user_status,
   p.created_at
 FROM public.profiles p
 JOIN auth.users u ON u.id = p.id
-WHERE p.status = 'approved'
+WHERE p.user_status = 'approved'
 ORDER BY p.created_at DESC;
 
 -- 7. Get all blocked users
 SELECT 
   p.id,
   u.email,
-  p.status,
+  p.user_status,
   p.created_at
 FROM public.profiles p
 JOIN auth.users u ON u.id = p.id
-WHERE p.status = 'blocked'
+WHERE p.user_status = 'blocked'
 ORDER BY p.created_at DESC;
 
 -- 8. Count users by status
 SELECT 
-  status,
+  user_status,
   COUNT(*) as count
 FROM public.profiles
-GROUP BY status;
+GROUP BY user_status;
 
 -- 9. Get admin user info
 SELECT 
   p.id,
   u.email,
-  p.status,
+  p.user_status,
   p.created_at
 FROM public.profiles p
 JOIN auth.users u ON u.id = p.id
@@ -86,6 +87,7 @@ WHERE u.email = 'admin@blowmeai.com';
 
 -- 10. Check cron jobs status
 SELECT * FROM cron.job;
+
 
 -- 11. Check recent cron job runs
 SELECT * FROM cron.job_run_details 

@@ -10,7 +10,7 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, loading, userStatus, isAdmin } = useAuth();
 
-  // Show loading only during initial auth check
+  // Show loading during initial auth check
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
@@ -29,6 +29,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <>{children}</>;
   }
 
+  // Show loading while user status is being fetched (prevents flash of dashboard)
+  if (userStatus === null) {
+    return (
+      <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#cc0000]" />
+      </div>
+    );
+  }
+
   // Check user status - only block if explicitly pending or blocked
   if (userStatus === 'pending') {
     return <Navigate to="/pending-approval" replace />;
@@ -38,8 +47,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to="/blocked" replace />;
   }
 
-  // If approved or null/unknown, allow access
-  // This ensures users aren't blocked by database issues
+  // If approved, allow access
   return <>{children}</>;
 };
 

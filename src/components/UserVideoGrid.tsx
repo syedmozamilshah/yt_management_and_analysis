@@ -150,6 +150,54 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
     };
   }, [user?.id, queryClient, toast]);
 
+  // Poll for new videos every 30 seconds while page is open
+  // This triggers the server-side RSS polling to catch new uploads quickly
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const pollForNewVideos = async () => {
+      try {
+        console.log('Polling RSS feeds for new videos...');
+        // Trigger server-side RSS polling
+        const { error } = await supabase.functions.invoke('poll-rss-feeds', {
+          body: {}
+        });
+        
+        if (error) {
+          console.error('Error polling RSS feeds:', error);
+          return;
+        }
+        
+        // After polling, sync any new videos to this user
+        const { data: syncCount } = await (supabase as any).rpc('sync_missed_videos_for_user', {
+          p_user_id: user.id
+        });
+        
+        if (syncCount && syncCount > 0) {
+          console.log(`Found ${syncCount} new videos from RSS poll`);
+          queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
+          toast({
+            title: "New Video Discovered!",
+            description: `${syncCount} new video${syncCount > 1 ? 's' : ''} from your tracked channels.`,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to poll for new videos:', err);
+      }
+    };
+
+    // Initial poll after 5 seconds
+    const initialPoll = setTimeout(pollForNewVideos, 5000);
+    
+    // Then poll every 30 seconds
+    const pollInterval = setInterval(pollForNewVideos, 30000);
+
+    return () => {
+      clearTimeout(initialPoll);
+      clearInterval(pollInterval);
+    };
+  }, [user?.id, queryClient, toast]);
+
   // Sync missed videos when user opens ideation (updates activity and syncs videos from last 7 days)
   useEffect(() => {
     if (!user?.id) return;

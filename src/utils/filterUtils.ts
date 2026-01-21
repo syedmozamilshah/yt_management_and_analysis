@@ -39,32 +39,50 @@ export const viewRanges = [
 export const getViewCountBounds = (videos: Video[]): { min: number; max: number } => {
   const viewCounts = videos
     .map(video => video.view_count)
-    .filter((count): count is number => count !== null && count !== undefined);
+    .filter((count): count is number => count !== null && count !== undefined && count >= 0);
   
   if (viewCounts.length === 0) {
     return { min: 0, max: 10000000 };
   }
   
-  return {
-    min: Math.min(...viewCounts),
-    max: Math.max(...viewCounts)
-  };
+  const min = Math.min(...viewCounts);
+  const max = Math.max(...viewCounts);
+  
+  // Ensure min !== max to prevent slider from breaking
+  // If they're equal, create a reasonable range around the value
+  if (min === max) {
+    return {
+      min: Math.max(0, min - Math.ceil(min * 0.1) - 1),
+      max: max + Math.ceil(max * 0.1) + 1
+    };
+  }
+  
+  return { min, max };
 };
 
 // Helper function to get min/max subscriber counts from videos
 export const getSubscriberCountBounds = (videos: Video[]): { min: number; max: number } => {
   const subscriberCounts = videos
     .map(video => video.channel_subscribers)
-    .filter((count): count is number => count !== null && count !== undefined);
+    .filter((count): count is number => count !== null && count !== undefined && count > 0);
   
   if (subscriberCounts.length === 0) {
     return { min: 0, max: 10000000 };
   }
   
-  return {
-    min: Math.min(...subscriberCounts),
-    max: Math.max(...subscriberCounts)
-  };
+  const min = Math.min(...subscriberCounts);
+  const max = Math.max(...subscriberCounts);
+  
+  // Ensure min !== max to prevent slider from breaking
+  // If they're equal, create a reasonable range around the value
+  if (min === max) {
+    return {
+      min: Math.max(0, min - Math.ceil(min * 0.1) - 1),
+      max: max + Math.ceil(max * 0.1) + 1
+    };
+  }
+  
+  return { min, max };
 };
 
 export const uploadTimingOptions = [
