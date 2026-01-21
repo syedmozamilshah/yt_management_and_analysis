@@ -149,6 +149,39 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
     };
   }, [user?.id, queryClient, toast]);
 
+  // Sync missed videos when user opens ideation (updates activity and syncs videos from last 7 days)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const syncMissedVideos = async () => {
+      try {
+        console.log('Syncing missed videos for user:', user.id);
+        const { data, error } = await (supabase as any).rpc('sync_missed_videos_for_user', {
+          p_user_id: user.id
+        });
+        
+        if (error) {
+          console.error('Error syncing missed videos:', error);
+          return;
+        }
+        
+        if (data && data > 0) {
+          console.log(`Synced ${data} missed videos`);
+          // Refetch videos to show newly synced ones
+          queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
+          toast({
+            title: "Videos Synced",
+            description: `${data} new video${data > 1 ? 's' : ''} added from your tracked channels.`,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to sync missed videos:', err);
+      }
+    };
+
+    syncMissedVideos();
+  }, [user?.id, queryClient, toast]);
+
   // Update filters when data changes
   React.useEffect(() => {
     if (videos && videos.length > 0) {
