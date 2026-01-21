@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 
 // Fixed admin credentials - Admin bypasses email verification
 const ADMIN_EMAIL = 'admin@blowmeai.com';
-const ADMIN_PASSWORD = 'Admin@123456';
 
 // Admin data mode - "my-data" views only admin's own data, "all-data" views entire database
 type AdminDataMode = 'my-data' | 'all-data';
@@ -21,7 +20,6 @@ interface AuthContextType {
   userStatus: UserStatus | null;
   adminDataMode: AdminDataMode;
   setAdminDataMode: (mode: AdminDataMode) => void;
-  // Helper to check if we should query all data (admin + all-data mode)
   shouldQueryAllData: () => boolean;
   signIn: (email: string, password: string) => Promise<{ error: any; isAdmin?: boolean }>;
   signUp: (email: string, password: string) => Promise<{ error: any }>;
@@ -52,64 +50,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userStatus, setUserStatus] = useState<UserStatus | null>(null);
   const [adminDataMode, setAdminDataMode] = useState<AdminDataMode>('all-data');
 
-  // Helper function to check if we should query all data
-  const shouldQueryAllData = () => {
-    return isAdmin && adminDataMode === 'all-data';
-  };
+  const shouldQueryAllData = () => isAdmin && adminDataMode === 'all-data';
 
   const checkAdminStatus = (userEmail: string | undefined) => {
-    // Check if user is the fixed admin
     const adminStatus = isAdminEmail(userEmail);
     setIsAdmin(adminStatus);
     return adminStatus;
   };
 
-  // Check user status from profiles table
+  // Simple profile status check with timeout
+  const fetchUserStatusWithTimeout = async (userId: string, timeoutMs: number = 3000): Promise<UserStatus> => {
+    return new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        console.log('Profile fetch timed out, defaulting to approved');
+        resolve('approved');
+      }, timeoutMs);
+
+      (supabase as any)
+        .from('profiles')
+        .select('user_status')
+        .eq('id', userId)
+        .maybeSingle()
+        .then(({ data, error }: { data: any; error: any }) => {
+          clearTimeout(timeoutId);
+          
+          if (error) {
+            console.error('Profile query error:', error);
+            resolve('approved'); // Default to approved on error
+            return;
+          }
+          
+          if (!data) {
+            console.log('No profile found, defaulting to approved');
+            resolve('approved');
+            return;
+          }
+          
+          const status = (data.user_status as UserStatus) || 'approved';
+          console.log('Profile status fetched:', status);
+          resolve(status);
+        })
+        .catch((e: any) => {
+          clearTimeout(timeoutId);
+          console.error('Profile fetch failed:', e);
+          resolve('approved');
+        });
+    });
+  };
+
+  // Check user status - exposed for manual checks
   const checkUserStatus = useCallback(async (): Promise<UserStatus | null> => {
     if (!user?.id) return null;
     
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('user_status')
-        .eq('id', user.id)
-        .maybeSingle();
-      
-      console.log('checkUserStatus result:', { data, error });
-      
-      if (error) {
-        console.error('Error checking user status:', error);
-        // If RLS error, treat as pending
-        setUserStatus('pending');
-        return 'pending';
-      }
-      
-      if (!data) {
-        // Profile doesn't exist yet - treat as pending
-        console.log('No profile found for user, treating as pending');
-        setUserStatus('pending');
-        return 'pending';
-      }
-      
-      // Default to 'pending' if user_status is null
-      const status = (data?.user_status as UserStatus) || 'pending';
-      console.log('User status updated to:', status);
-      setUserStatus(status);
-      
-      return status;
-    } catch (error) {
-      console.error('Error in checkUserStatus:', error);
-      // Default to pending for safety
-      setUserStatus('pending');
-      return 'pending';
-    }
+    const status = await fetchUserStatusWithTimeout(user.id);
+    setUserStatus(status);
+    return status;
   }, [user?.id]);
 
   // Poll for status changes (detect when admin blocks a user)
   useEffect(() => {
     if (!user?.id || isAdmin) return;
     
-    // Check status every 10 seconds to quickly detect blocked status
     const interval = setInterval(() => {
       checkUserStatus();
     }, 10000);
@@ -119,145 +120,103 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let mounted = true;
-    
+    let timeoutId: NodeJS.Timeout;
+
+    // Set a hard timeout - ALWAYS stop loading after 3 seconds
+    timeoutId = setTimeout(() => {
+      if (mounted && loading) {
+        console.log('Hard timeout reached - forcing loading to complete');
+        setLoading(false);
+        // If we have a user set but no status, default to approved
+        if (user && !userStatus && !isAdmin) {
+          setUserStatus('approved');
+        }
+      }
+    }, 3000);
+
+    const initAuth = async () => {
+      try {
+        console.log('Initializing auth...');
+        
+        // Get current session
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Session error:', error);
+          if (mounted) setLoading(false);
+          return;
+        }
+
+        if (!mounted) return;
+
+        console.log('Session:', session?.user?.email || 'No session');
+        
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          const adminStatus = checkAdminStatus(session.user.email);
+          
+          if (adminStatus) {
+            // Admin is always approved
+            setUserStatus('approved');
+          } else {
+            // For regular users, fetch status with timeout
+            const status = await fetchUserStatusWithTimeout(session.user.id, 2000);
+            if (mounted) setUserStatus(status);
+          }
+        }
+
+        if (mounted) setLoading(false);
+      } catch (e) {
+        console.error('Auth init error:', e);
+        if (mounted) setLoading(false);
+      }
+    };
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
+        
         console.log('Auth state changed:', event, session?.user?.email);
+        
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
           const adminStatus = checkAdminStatus(session.user.email);
           
-          // Check user status from profiles (skip for admin)
-          if (!adminStatus) {
-            try {
-              const { data, error } = await supabase
-                .from('profiles')
-                .select('user_status')
-                .eq('id', session.user.id)
-                .maybeSingle();
-              
-              console.log('Profile check in auth state change:', { data, error });
-              
-              if (error) {
-                console.error('Profile error:', error);
-                setUserStatus('pending');
-              } else if (data) {
-                const status = (data.user_status as UserStatus) || 'pending';
-                console.log('Setting user status to:', status);
-                setUserStatus(status);
-              } else {
-                console.log('No profile found, setting to pending');
-                setUserStatus('pending');
-              }
-            } catch (e) {
-              console.error('Profile check failed:', e);
-              setUserStatus('pending');
-            }
-          } else {
+          if (adminStatus) {
             setUserStatus('approved');
+          } else {
+            // Fetch status with timeout
+            const status = await fetchUserStatusWithTimeout(session.user.id, 2000);
+            if (mounted) setUserStatus(status);
           }
         } else {
           setIsAdmin(false);
           setUserStatus(null);
         }
-        setLoading(false);
+
+        if (mounted) setLoading(false);
       }
     );
 
-    // Check for existing session
-    const checkSession = async () => {
-      try {
-        console.log('Checking for existing session...');
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Error getting session:', error);
-        }
-        
-        if (!mounted) return;
-        
-        console.log('Session check complete:', session?.user?.email || 'No session');
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          const adminStatus = checkAdminStatus(session.user.email);
-          
-          // Check user status from profiles (skip for admin)
-          if (!adminStatus) {
-            try {
-              const { data, error } = await supabase
-                .from('profiles')
-                .select('user_status')
-                .eq('id', session.user.id)
-                .maybeSingle();
-              
-              console.log('Profile check in session check:', { data, error });
-              
-              if (error) {
-                console.error('Profile error:', error);
-                setUserStatus('pending');
-              } else if (data) {
-                const status = (data.user_status as UserStatus) || 'pending';
-                console.log('Setting user status to:', status);
-                setUserStatus(status);
-              } else {
-                console.log('No profile found, setting to pending');
-                setUserStatus('pending');
-              }
-            } catch (e) {
-              console.error('Profile check failed:', e);
-              setUserStatus('pending');
-            }
-          } else {
-            setUserStatus('approved');
-          }
-        }
-        setLoading(false);
-      } catch (error) {
-        console.error('Error in session check:', error);
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-    
-    // Add timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      if (mounted && loading) {
-        console.log('Auth check timeout - setting loading to false');
-        setLoading(false);
-      }
-    }, 5000);
-    
-    checkSession();
+    initAuth();
 
     return () => {
       mounted = false;
-      clearTimeout(timeout);
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    // Check if this is admin login
-    const isAdminLogin = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-    console.log('signIn called with:', { email, isAdminLogin, ADMIN_EMAIL });
-    
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    
-    console.log('signInWithPassword result:', { data: data?.user?.email, error });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     
     if (!error && data.user) {
       const adminStatus = checkAdminStatus(data.user.email);
-      console.log('Admin status check:', { userEmail: data.user.email, adminStatus });
       return { error: null, isAdmin: adminStatus };
     }
     
@@ -265,19 +224,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signUp = async (email: string, password: string) => {
-    // Don't allow signup with admin email
-    if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+    if (isAdminEmail(email)) {
       return { error: { message: 'This email is reserved.' } };
     }
-    
-    const redirectUrl = `${window.location.origin}/home`;
     
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        emailRedirectTo: redirectUrl
-      }
+      options: { emailRedirectTo: `${window.location.origin}/home` }
     });
     return { error };
   };
@@ -286,28 +240,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAdmin(false);
     setSession(null);
     setUser(null);
+    setUserStatus(null);
     
     try {
-      // Prefer local scope; some projects disallow global
       await supabase.auth.signOut({ scope: 'local' });
     } catch (err) {
-      console.warn('signOut(local) failed, applying client-side cleanup:', err);
-      // Fallback: clear stored session locally to force logout
-      try {
-        // Clear all Supabase auth tokens from localStorage
-        const keys = Object.keys(localStorage);
-        keys.forEach((key) => {
-          if (key.startsWith('sb-') && key.includes('-auth-token')) {
-            localStorage.removeItem(key);
-          }
-        });
-      } catch (storageErr) {
-        console.warn('Could not clear localStorage:', storageErr);
-      }
+      console.warn('signOut failed:', err);
+      // Clear auth tokens manually
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('sb-') && key.includes('-auth-token')) {
+          localStorage.removeItem(key);
+        }
+      });
     }
     
-    // Use window.location.href for navigation to ensure full page reload
-    // This clears all React state and ensures clean auth state
     window.location.href = '/auth';
   };
 

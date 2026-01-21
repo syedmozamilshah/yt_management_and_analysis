@@ -50,28 +50,43 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
       
       console.log('UserVideoGrid: Fetching videos for user:', user.id);
       
-      // Use any cast to bypass potential type issues
-      const { data, error } = await (supabase as any)
-        .from('user_videos')
-        .select('id, title, youtube_url, video_id, thumbnail_url, channel_name, channel_subscribers, upload_date, view_count, niche, is_favorite, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(200);
+      // Fetch all videos without limit - Supabase returns max 1000 by default
+      // For users with 800+ videos, we may need pagination in the future
+      let allVideos: any[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      
+      while (true) {
+        const { data, error } = await (supabase as any)
+          .from('user_videos')
+          .select('id, title, youtube_url, video_id, thumbnail_url, channel_name, channel_subscribers, upload_date, view_count, niche, is_favorite, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .range(from, from + pageSize - 1);
 
-      console.log('UserVideoGrid: Query result', { count: data?.length, error });
+        if (error) {
+          console.error('Error fetching user videos:', error);
+          throw error;
+        }
 
-      if (error) {
-        console.error('Error fetching user videos:', error);
-        toast({
-          title: "Error",
-          description: error.message || "Failed to load your videos",
-          variant: "destructive"
-        });
+        if (!data || data.length === 0) break;
+        
+        allVideos = [...allVideos, ...data];
+        
+        // If we got less than pageSize, we've reached the end
+        if (data.length < pageSize) break;
+        
+        from += pageSize;
+      }
+
+      console.log('UserVideoGrid: Query result', { count: allVideos.length });
+
+      if (allVideos.length === 0) {
         return [];
       }
 
       // Transform user_videos to Video format
-      return (data || []).map((uv: any) => ({
+      return allVideos.map((uv: any) => ({
         id: uv.id,
         title: uv.title,
         youtube_url: uv.youtube_url,

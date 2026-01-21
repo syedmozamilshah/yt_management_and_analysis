@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,7 +9,7 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, loading, userStatus, isAdmin } = useAuth();
 
-  // Show loading during initial auth check
+  // Show loading only during initial auth check
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
@@ -19,38 +18,28 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     );
   }
 
+  // Not logged in - redirect to auth
   if (!user) {
     return <Navigate to="/auth" replace />;
   }
 
-  // Admin always has access - no need to check userStatus
+  // Admin always has access
   if (isAdmin) {
     return <>{children}</>;
   }
 
-  // For regular users, check their status
-  // Handle pending status
+  // Check user status - only block if explicitly pending or blocked
   if (userStatus === 'pending') {
     return <Navigate to="/pending-approval" replace />;
   }
 
-  // Handle blocked status
   if (userStatus === 'blocked') {
     return <Navigate to="/blocked" replace />;
   }
 
-  // If status is 'approved', show content
-  if (userStatus === 'approved') {
-    return <>{children}</>;
-  }
-
-  // If status is null/undefined (still loading profile), show a brief loading state
-  // This ensures the session is fully ready before rendering protected content
-  return (
-    <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
-      <div className="text-[#f1f1f1]">Loading...</div>
-    </div>
-  );
+  // If approved or null/unknown, allow access
+  // This ensures users aren't blocked by database issues
+  return <>{children}</>;
 };
 
 export default ProtectedRoute;
