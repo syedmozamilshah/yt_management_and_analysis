@@ -1,0 +1,254 @@
+@startuml BlowMeAI_User_Flow
+
+title BlowMeAI - User Authentication & Admin Management Flow
+
+skinparam backgroundColor #0f0f0f
+skinparam defaultTextAlignment center
+skinparam ArrowColor #cc0000
+skinparam ActivityBackgroundColor #181818
+skinparam ActivityBorderColor #272727
+skinparam ActivityFontColor #f1f1f1
+skinparam NoteBackgroundColor #272727
+skinparam NoteBorderColor #404040
+skinparam NoteFontColor #aaaaaa
+
+|User|
+start
+:User visits website;
+if (Already logged in?) then (yes)
+  :Check user status;
+else (no)
+  :Show Auth Page;
+  :User signs up / logs in\nvia Supabase Auth;
+  :Create profile record\nwith status = 'pending';
+endif
+
+|System|
+:Fetch user profile status;
+
+if (User is Admin?) then (yes)
+  |Admin|
+  :Redirect to Admin Dashboard;
+  :Can manage users\n(approve/block/delete);
+  :Can add channels for ALL users;
+  :Can view all statistics;
+  stop
+else (no)
+  |System|
+  switch (User Status?)
+  case (pending)
+    |User|
+    :Show Pending Approval Page;
+    :Display message:\n"Your account is pending approval";
+    :User can only sign out;
+    note right
+      User waits for admin
+      to approve their account
+    end note
+    stop
+  case (blocked)
+    |User|
+    :Show Blocked Account Page;
+    :Display message:\n"Your account has been blocked";
+    :Show admin contact info;
+    :User can only sign out;
+    stop
+  case (approved)
+    |User|
+    :Redirect to Ideation Page;
+    :Sync missed videos\n(from last 7 days);
+    :Update user activity\n(last_ideation_opened_at);
+    :Load user's videos;
+  endswitch
+endif
+
+|Ideation Page|
+:Display videos grid\nwith filters;
+
+fork
+  :Real-time subscription\nfor new videos;
+fork again
+  :User can:\n- Filter by niche/views/subs\n- Favorite videos\n- Delete videos\n- Select multiple;
+fork again
+  :User can add channels\nvia sidebar;
+end fork
+
+|Adding Channel|
+:User clicks "Add Channel";
+:Enter channel URL/handle;
+:Select time period;
+:Click "Analyze Channel";
+
+|System|
+:Resolve channel via RSS\n(no API quota);
+:Fetch recent videos\nfrom RSS feed;
+:Show analysis dialog;
+
+|User|
+:Select niche for videos;
+:Click "Add to Ideation";
+
+|System|
+:Save to user_videos table;
+:Save channel subscription\nfor future auto-sync;
+:Refresh ideation grid;
+
+|Background Jobs|
+partition "Every 5 minutes" {
+  :RSS Poll Cron Job;
+  :Fetch new videos from\nall tracked channels;
+  :Insert to tracked_videos;
+  :Trigger auto_sync to users\n(only active in 72h);
+}
+
+partition "Every 6 hours" {
+  :View Count Update Job;
+  :Update view counts\nfor recent videos;
+}
+
+|Admin Dashboard|
+:Admin logs in;
+:View dashboard with stats;
+
+fork
+  :Manage Users Tab;
+  :See all users list;
+  :Approve pending users;
+  :Block users;
+  :Delete users;
+fork again
+  :View Statistics;
+  :Total users count;
+  :Videos count;
+  :Channels count;
+fork again
+  :Add Global Channels;
+  :Via "Add Channel" button;
+  :Select "Add for All Users";
+  :Videos sync to ALL users;
+end fork
+
+|User Status Changes|
+note right
+  **Status Flow:**
+  1. New signup → pending
+  2. Admin approves → approved
+  3. Admin blocks → blocked
+  4. Admin can unblock → approved
+end note
+
+stop
+
+@enduml
+
+'========================================
+' ADDITIONAL DIAGRAMS
+'========================================
+
+@startuml Video_Sync_Flow
+
+title Video Sync Flow - RSS Polling & Real-time Updates
+
+skinparam backgroundColor #0f0f0f
+skinparam sequenceArrowColor #cc0000
+skinparam sequenceParticipantBackgroundColor #181818
+skinparam sequenceParticipantBorderColor #272727
+skinparam sequenceLifeLineBorderColor #404040
+
+participant "Cron Job\n(Every 5 min)" as Cron
+participant "poll-rss-feeds\nEdge Function" as RSS
+participant "YouTube\nRSS Feed" as YT
+database "tracked_videos" as TV
+database "user_videos" as UV
+participant "Realtime\nSubscription" as RT
+participant "User Browser" as User
+
+== RSS Polling (Every 5 minutes) ==
+Cron -> RSS: Trigger poll
+RSS -> RSS: Get channels to poll\n(get_channels_for_rss_poll)
+loop For each channel
+  RSS -> YT: Fetch RSS feed
+  YT --> RSS: Video entries
+  RSS -> TV: Insert new videos
+  note right: Only insert if\nvideo_id not exists
+  TV -> TV: Trigger:\nauto_sync_video_to_users
+  TV -> UV: Insert for users\nactive in 72h
+  UV --> RT: Broadcast INSERT event
+  RT --> User: Real-time notification
+  User -> User: Refresh video list\n& show toast
+end
+
+== User Opens Ideation (After being inactive) ==
+User -> UV: Call sync_missed_videos_for_user
+UV -> TV: Get videos from last 7 days
+UV -> UV: Insert missed videos
+UV --> User: Return count of synced videos
+User -> User: Show toast:\n"X videos synced"
+
+@enduml
+
+@startuml Admin_Approval_Flow
+
+title Admin User Approval Flow
+
+skinparam backgroundColor #0f0f0f
+skinparam stateBackgroundColor #181818
+skinparam stateBorderColor #272727
+skinparam stateFontColor #f1f1f1
+skinparam ArrowColor #cc0000
+
+[*] --> Signup : User creates account
+
+state Signup {
+  [*] --> CreatingProfile
+  CreatingProfile : Insert into profiles table
+  CreatingProfile : status = 'pending'
+  CreatingProfile --> [*]
+}
+
+Signup --> Pending
+
+state Pending {
+  [*] --> WaitingForAdmin
+  WaitingForAdmin : User sees "Pending Approval" page
+  WaitingForAdmin : Cannot access any features
+  WaitingForAdmin --> [*]
+}
+
+Pending --> Approved : Admin clicks "Approve"
+Pending --> Blocked : Admin clicks "Block"
+
+state Approved {
+  [*] --> ActiveUser
+  ActiveUser : Full access to all features
+  ActiveUser : Can use ideation
+  ActiveUser : Can add channels
+  ActiveUser : Can use AI tools
+  ActiveUser --> [*]
+}
+
+state Blocked {
+  [*] --> BlockedUser
+  BlockedUser : User sees "Blocked" page
+  BlockedUser : Can only sign out
+  BlockedUser : Can contact admin
+  BlockedUser --> [*]
+}
+
+Approved --> Blocked : Admin blocks user
+Blocked --> Approved : Admin unblocks user
+
+Approved --> Deleted : Admin deletes user
+Pending --> Deleted : Admin deletes user
+Blocked --> Deleted : Admin deletes user
+
+state Deleted {
+  [*] --> RemovedFromSystem
+  RemovedFromSystem : User data deleted
+  RemovedFromSystem : Videos removed
+  RemovedFromSystem --> [*]
+}
+
+Deleted --> [*]
+
+@enduml

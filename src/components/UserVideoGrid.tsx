@@ -61,6 +61,7 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
           .from('user_videos')
           .select('id, title, youtube_url, video_id, thumbnail_url, channel_name, channel_subscribers, upload_date, view_count, niche, is_favorite, created_at')
           .eq('user_id', user.id)
+          .order('upload_date', { ascending: false, nullsFirst: false })
           .order('created_at', { ascending: false })
           .range(from, from + pageSize - 1);
 
