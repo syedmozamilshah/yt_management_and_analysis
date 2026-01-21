@@ -73,13 +73,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('profiles')
         .select('user_status')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
       
       console.log('checkUserStatus result:', { data, error });
       
       if (error) {
         console.error('Error checking user status:', error);
-        // If profile doesn't exist or RLS error, treat as pending
+        // If RLS error, treat as pending
+        setUserStatus('pending');
+        return 'pending';
+      }
+      
+      if (!data) {
+        // Profile doesn't exist yet - treat as pending
+        console.log('No profile found for user, treating as pending');
         setUserStatus('pending');
         return 'pending';
       }

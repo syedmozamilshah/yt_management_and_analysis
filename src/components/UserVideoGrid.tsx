@@ -40,7 +40,7 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch user's personal videos
-  const { data: videos = [], isLoading, refetch, error: queryError } = useQuery({
+  const { data: videos = [], isLoading, isFetching, refetch, error: queryError } = useQuery({
     queryKey: ['user-videos', user?.id, refreshTrigger],
     queryFn: async () => {
       if (!user?.id) {
@@ -50,76 +50,58 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
       
       console.log('UserVideoGrid: Fetching videos for user:', user.id);
       
-      try {
-        // Add timeout wrapper to detect hanging queries
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Query timeout after 15s')), 15000);
+      // Use any cast to bypass potential type issues
+      const { data, error } = await (supabase as any)
+        .from('user_videos')
+        .select('id, title, youtube_url, video_id, thumbnail_url, channel_name, channel_subscribers, upload_date, view_count, niche, is_favorite, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      console.log('UserVideoGrid: Query result', { count: data?.length, error });
+
+      if (error) {
+        console.error('Error fetching user videos:', error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to load your videos",
+          variant: "destructive"
         });
-        
-        const queryPromise = supabase
-          .from('user_videos')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-
-        const result = await Promise.race([queryPromise, timeoutPromise]) as any;
-        const { data, error } = result;
-
-        console.log('UserVideoGrid: Query completed', { dataLength: data?.length, error });
-
-        if (error) {
-          console.error('Error fetching user videos:', error);
-          toast({
-            title: "Error",
-            description: "Failed to load your videos",
-            variant: "destructive"
-          });
-          return [];
-        }
-
-        console.log('UserVideoGrid: Fetched', data?.length || 0, 'videos');
-
-        // Transform user_videos to Video format
-        return (data || []).map((uv: any) => ({
-          id: uv.id,
-          title: uv.title,
-          youtube_url: uv.youtube_url,
-          video_id: uv.video_id,
-          thumbnail_url: uv.thumbnail_url,
-          channel_name: uv.channel_name,
-          channel_subscribers: uv.channel_subscribers,
-          upload_date: uv.upload_date,
-          view_count: uv.view_count,
-          niche: uv.niche,
-          is_favorite: uv.is_favorite,
-          created_at: uv.created_at,
-        })) as Video[];
-      } catch (e: any) {
-        console.error('UserVideoGrid: Exception during fetch:', e?.message || e);
-        if (e?.message?.includes('timeout')) {
-          toast({
-            title: "Query Timeout",
-            description: "Database query is taking too long. Please refresh.",
-            variant: "destructive"
-          });
-        }
         return [];
       }
+
+      // Transform user_videos to Video format
+      return (data || []).map((uv: any) => ({
+        id: uv.id,
+        title: uv.title,
+        youtube_url: uv.youtube_url,
+        video_id: uv.video_id,
+        thumbnail_url: uv.thumbnail_url,
+        channel_name: uv.channel_name,
+        channel_subscribers: uv.channel_subscribers,
+        upload_date: uv.upload_date,
+        view_count: uv.view_count,
+        niche: uv.niche,
+        is_favorite: uv.is_favorite,
+        created_at: uv.created_at,
+      })) as Video[];
     },
     enabled: !!user?.id,
-    staleTime: 0, // Always consider data stale
-    refetchOnMount: 'always', // Always refetch when component mounts (navigation)
+    staleTime: 0, // Always consider data stale for fresh fetches
+    refetchOnMount: 'always', // Always refetch when component mounts
+    retry: 2,
   });
 
   // Debug logging
   React.useEffect(() => {
     console.log('UserVideoGrid state:', { 
       userId: user?.id, 
-      isLoading, 
+      isLoading,
+      isFetching,
       videosCount: videos.length,
       queryError 
     });
-  }, [user?.id, isLoading, videos.length, queryError]);
+  }, [user?.id, isLoading, isFetching, videos.length, queryError]);
 
   // Update filters when data changes
   React.useEffect(() => {
@@ -235,7 +217,11 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
     }
   };
 
-  if (isLoading) {
+  // Only show loading skeleton on initial load (when we have no cached data)
+  // This prevents skeleton flash on navigation back to the page
+  const showLoadingSkeleton = isLoading && videos.length === 0;
+
+  if (showLoadingSkeleton) {
     return (
       <div className="space-y-6">
         {/* Loading Filter Bar */}

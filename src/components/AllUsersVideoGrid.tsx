@@ -194,7 +194,10 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
     }
   };
 
-  if (isLoading) {
+  // Only show loading skeleton on initial load (when we have no cached data)
+  const showLoadingSkeleton = isLoading && videos.length === 0;
+
+  if (showLoadingSkeleton) {
     return (
       <div className="space-y-6">
         {/* Loading Filter Bar */}

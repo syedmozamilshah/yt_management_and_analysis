@@ -4,6 +4,10 @@
 -- Also approve existing users who were set to pending
 -- ============================================
 
+-- Drop all versions of is_admin function to avoid conflicts
+DROP FUNCTION IF EXISTS public.is_admin();
+DROP FUNCTION IF EXISTS public.is_admin(uuid);
+
 -- Update the is_admin function to use the correct admin email
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN AS $$
@@ -32,5 +36,5 @@ WHERE user_status = 'pending'
   );
 
 -- Grant execute permission
-GRANT EXECUTE ON FUNCTION public.is_admin TO authenticated;
-GRANT EXECUTE ON FUNCTION public.is_admin TO anon;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO anon;

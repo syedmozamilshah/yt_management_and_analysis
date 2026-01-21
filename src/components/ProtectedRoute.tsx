@@ -10,7 +10,7 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, loading, userStatus, isAdmin } = useAuth();
 
-  // Only show loading during initial auth check
+  // Show loading during initial auth check
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
@@ -29,19 +29,28 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   // For regular users, check their status
-  // If status is still null (not loaded yet), show content to avoid flash
-  // The status check will happen in the background
+  // Handle pending status
   if (userStatus === 'pending') {
     return <Navigate to="/pending-approval" replace />;
   }
 
+  // Handle blocked status
   if (userStatus === 'blocked') {
     return <Navigate to="/blocked" replace />;
   }
 
-  // If status is 'approved' or null (still loading), show content
-  // This prevents loading skeleton flash for approved users
-  return <>{children}</>;
+  // If status is 'approved', show content
+  if (userStatus === 'approved') {
+    return <>{children}</>;
+  }
+
+  // If status is null/undefined (still loading profile), show a brief loading state
+  // This ensures the session is fully ready before rendering protected content
+  return (
+    <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
+      <div className="text-[#f1f1f1]">Loading...</div>
+    </div>
+  );
 };
 
 export default ProtectedRoute;

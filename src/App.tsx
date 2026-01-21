@@ -26,12 +26,12 @@ const queryClient = new QueryClient({
     queries: {
       // Disable refetch on window focus to prevent loading skeleton flicker
       refetchOnWindowFocus: false,
-      // Keep data fresh for 5 minutes before considering it stale
-      staleTime: 5 * 60 * 1000,
+      // Keep data fresh for 2 minutes before considering it stale
+      staleTime: 2 * 60 * 1000,
       // Keep cached data for 30 minutes
       gcTime: 30 * 60 * 1000,
-      // Don't refetch on mount if data is still fresh
-      refetchOnMount: false,
+      // Allow refetch on mount - individual queries can override this
+      refetchOnMount: true,
       // Retry failed requests only once
       retry: 1,
     },
