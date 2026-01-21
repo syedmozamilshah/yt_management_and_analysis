@@ -120,3 +120,60 @@ SELECT
 FROM public.tracked_videos
 ORDER BY created_at DESC
 LIMIT 20;
+
+-- ============================================
+-- FIX "Unknown Channel" Issue - Run these commands
+-- ============================================
+
+-- 16. Find videos with "Unknown Channel"
+SELECT COUNT(*) as unknown_channel_count 
+FROM public.user_videos 
+WHERE channel_name = 'Unknown Channel' OR channel_name IS NULL OR channel_name = '';
+
+-- 17. Fix user_videos - get channel name from tracked_videos
+UPDATE public.user_videos uv
+SET channel_name = tv.channel_name
+FROM public.tracked_videos tv
+WHERE uv.video_id = tv.video_id
+  AND tv.channel_name IS NOT NULL
+  AND tv.channel_name != ''
+  AND tv.channel_name != 'Unknown Channel'
+  AND (uv.channel_name IS NULL OR uv.channel_name = 'Unknown Channel' OR uv.channel_name = '');
+
+-- 18. Fix user_videos - get channel name from tracked_channels using channel_id
+UPDATE public.user_videos uv
+SET channel_name = tc.channel_name
+FROM public.tracked_channels tc
+WHERE uv.channel_id = tc.channel_id
+  AND tc.channel_name IS NOT NULL
+  AND tc.channel_name != ''
+  AND (uv.channel_name IS NULL OR uv.channel_name = 'Unknown Channel' OR uv.channel_name = '');
+
+-- 19. Fix user_videos - get channel name from admin_global_channels
+UPDATE public.user_videos uv
+SET channel_name = agc.channel_name
+FROM public.admin_global_channels agc
+WHERE uv.channel_id = agc.channel_id
+  AND agc.channel_name IS NOT NULL
+  AND agc.channel_name != ''
+  AND (uv.channel_name IS NULL OR uv.channel_name = 'Unknown Channel' OR uv.channel_name = '');
+
+-- 20. Fix tracked_videos - get channel name from tracked_channels
+UPDATE public.tracked_videos tv
+SET channel_name = tc.channel_name
+FROM public.tracked_channels tc
+WHERE tv.channel_id = tc.channel_id
+  AND tc.channel_name IS NOT NULL
+  AND tc.channel_name != ''
+  AND (tv.channel_name IS NULL OR tv.channel_name = 'Unknown Channel' OR tv.channel_name = '');
+
+-- 21. Verify fix - check remaining unknown channels
+SELECT COUNT(*) as remaining_unknown 
+FROM public.user_videos 
+WHERE channel_name = 'Unknown Channel' OR channel_name IS NULL OR channel_name = '';
+
+-- 22. List videos still with unknown channel (to debug)
+SELECT uv.id, uv.video_id, uv.channel_id, uv.channel_name, uv.title
+FROM public.user_videos uv
+WHERE uv.channel_name = 'Unknown Channel' OR uv.channel_name IS NULL OR uv.channel_name = ''
+LIMIT 20;
