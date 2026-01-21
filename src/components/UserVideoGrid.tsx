@@ -137,8 +137,33 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
   }, [videos, filters]);
 
   const availableNiches = useMemo(() => {
-    return getUniqueNiches(videos);
+    const videoNiches = getUniqueNiches(videos);
+    return videoNiches;
   }, [videos]);
+
+  // Fetch global niches from admin_global_niches
+  const { data: globalNiches = [] } = useQuery({
+    queryKey: ['global-niches'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('admin_global_niches')
+        .select('niche')
+        .eq('is_active', true);
+      
+      if (error) {
+        console.error('Error fetching global niches:', error);
+        return [];
+      }
+      return data?.map(n => n.niche) || [];
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Combine video niches and global niches
+  const allNiches = useMemo(() => {
+    const combined = new Set([...availableNiches, ...globalNiches]);
+    return Array.from(combined).sort();
+  }, [availableNiches, globalNiches]);
 
   const handleFavoriteUpdate = () => {
     refetch();
@@ -290,7 +315,7 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
           <FilterBar
             filters={filters}
             onFiltersChange={setFilters}
-            availableNiches={availableNiches}
+            availableNiches={allNiches}
             filteredCount={filteredVideos.length}
             totalCount={videos.length}
             videos={videos}

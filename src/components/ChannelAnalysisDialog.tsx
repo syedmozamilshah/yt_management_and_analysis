@@ -130,32 +130,16 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
       }
 
       if (mode === 'global' && isAdmin) {
-        // Admin adding for all users - add to the global 'videos' table
-        const videosToInsert = videos.map(video => ({
-          title: video.title,
-          youtube_url: video.youtube_url || `https://www.youtube.com/watch?v=${video.video_id}`,
-          video_id: video.video_id,
-          thumbnail_url: video.thumbnail_url || `https://i.ytimg.com/vi/${video.video_id}/hqdefault.jpg`,
-          channel_name: channelData.channel_name,
-          channel_id: channelData.channel_id,
-          channel_subscribers: channelData.channel_subscribers,
-          upload_date: video.published_at,
-          view_count: viewCountsMap[video.video_id] ?? video.view_count ?? 0,
-          niche: niche.trim()
-        }));
-
-        const { error } = await supabase
-          .from('videos')
-          .insert(videosToInsert);
-
-        if (error) throw error;
-
-        // Also create a global channel subscription so new videos are auto-added
-        await (supabase as any)
-          .from('admin_channel_subscriptions')
+        // Admin adding for all users - add to ALL users' tracked_channels, user_videos, and user_niches
+        
+        // 1. First, add the channel to admin_global_channels (triggers auto-sync to all users)
+        const { error: globalChannelError } = await (supabase as any)
+          .from('admin_global_channels')
           .upsert({
             channel_id: channelData.channel_id,
             channel_name: channelData.channel_name,
+            channel_thumbnail: channelData.channel_thumbnail,
+            channel_subscribers: channelData.channel_subscribers,
             niche: niche.trim(),
             is_active: true,
             updated_at: new Date().toISOString()
@@ -163,12 +147,121 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
             onConflict: 'channel_id'
           });
 
+        if (globalChannelError) {
+          console.error('Error adding global channel:', globalChannelError);
+        }
+
+        // 2. Add niche to admin_global_niches (will sync to all users)
+        await (supabase as any)
+          .from('admin_global_niches')
+          .upsert({
+            niche: niche.trim(),
+            is_active: true
+          }, {
+            onConflict: 'niche'
+          });
+
+        // 3. Get all users to add the channel/videos/niche to each
+        const { data: allUsers, error: usersError } = await supabase
+          .from('profiles')
+          .select('id');
+
+        if (usersError) throw usersError;
+
+        // 4. Add tracked channel for each user
+        const trackedChannelsToInsert = (allUsers || []).map(u => ({
+          user_id: u.id,
+          channel_id: channelData.channel_id,
+          channel_name: channelData.channel_name,
+          channel_handle: channelData.channel_handle,
+          channel_thumbnail: channelData.channel_thumbnail,
+          channel_subscribers: channelData.channel_subscribers,
+          is_global: true
+        }));
+
+        if (trackedChannelsToInsert.length > 0) {
+          await (supabase as any)
+            .from('tracked_channels')
+            .upsert(trackedChannelsToInsert, {
+              onConflict: 'user_id,channel_id',
+              ignoreDuplicates: true
+            });
+        }
+
+        // 5. Add videos to each user's user_videos
+        const userVideosToInsert: any[] = [];
+        for (const u of (allUsers || [])) {
+          for (const video of videos) {
+            userVideosToInsert.push({
+              user_id: u.id,
+              title: video.title,
+              youtube_url: video.youtube_url || `https://www.youtube.com/watch?v=${video.video_id}`,
+              video_id: video.video_id,
+              thumbnail_url: video.thumbnail_url || `https://i.ytimg.com/vi/${video.video_id}/hqdefault.jpg`,
+              channel_name: channelData.channel_name,
+              channel_id: channelData.channel_id,
+              channel_subscribers: channelData.channel_subscribers,
+              upload_date: video.published_at,
+              view_count: viewCountsMap[video.video_id] ?? video.view_count ?? 0,
+              niche: niche.trim(),
+              is_global: true
+            });
+          }
+        }
+
+        // Insert in batches of 500 to avoid timeouts
+        const batchSize = 500;
+        for (let i = 0; i < userVideosToInsert.length; i += batchSize) {
+          const batch = userVideosToInsert.slice(i, i + batchSize);
+          await (supabase as any)
+            .from('user_videos')
+            .upsert(batch, {
+              onConflict: 'user_id,video_id',
+              ignoreDuplicates: true
+            });
+        }
+
+        // 6. Add niche to each user's user_niches
+        const userNichesToInsert = (allUsers || []).map(u => ({
+          user_id: u.id,
+          niche: niche.trim(),
+          is_global: true
+        }));
+
+        if (userNichesToInsert.length > 0) {
+          await (supabase as any)
+            .from('user_niches')
+            .upsert(userNichesToInsert, {
+              onConflict: 'user_id,niche',
+              ignoreDuplicates: true
+            });
+        }
+
+        // 7. Add channel subscription for auto-syncing future videos to all users
+        const channelSubsToInsert = (allUsers || []).map(u => ({
+          user_id: u.id,
+          channel_id: channelData.channel_id,
+          niche: niche.trim(),
+          is_active: true,
+          is_global: true,
+          updated_at: new Date().toISOString()
+        }));
+
+        if (channelSubsToInsert.length > 0) {
+          await (supabase as any)
+            .from('user_channel_subscriptions')
+            .upsert(channelSubsToInsert, {
+              onConflict: 'user_id,channel_id',
+              ignoreDuplicates: true
+            });
+        }
+
         // Invalidate the videos query to refresh
-        queryClient.invalidateQueries({ queryKey: ['videos'] });
+        queryClient.invalidateQueries({ queryKey: ['user-videos'] });
 
         toast({
-          title: "✅ Videos Added for All Users!",
-          description: `Successfully added ${videos.length} video${videos.length > 1 ? 's' : ''} visible to all users. Future videos from this channel will be auto-added.`
+          title: "✅ Added for All Users!",
+          description: `Successfully added ${videos.length} videos to ALL ${allUsers?.length || 0} users. Future videos will be auto-added.`
         });
       } else {
         // Regular user or admin personal mode - add to user_videos

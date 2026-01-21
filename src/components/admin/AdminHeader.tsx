@@ -2,7 +2,7 @@
 import React from 'react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { FileText, Plus, Video, Users, Target, BarChart3, UserCheck } from 'lucide-react';
+import { FileText, Plus, Video, Users, Target, BarChart3, UserCheck, Globe } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface AdminHeaderProps {
