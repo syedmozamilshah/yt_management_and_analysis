@@ -100,7 +100,16 @@ export const AIPromptsSettingsDrawer: React.FC<AIPromptsSettingsDrawerProps> = (
                 onClick={() => editingTool !== tool.id && setEditingTool(tool.id)}
               >
                 <div className="flex items-center gap-3">
-                  <img src={tool.icon} alt={tool.name} className="w-10 h-10 rounded-lg shadow-sm" />
+                  <div className="w-10 h-10 rounded-lg shadow-sm overflow-hidden bg-[#272727] flex items-center justify-center">
+                    <img 
+                      src={tool.icon} 
+                      alt={tool.name} 
+                      className="w-full h-full object-cover" 
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
                   <span className="text-[#f1f1f1] font-medium text-lg">{tool.name}</span>
                 </div>
                 {editingTool !== tool.id ? (

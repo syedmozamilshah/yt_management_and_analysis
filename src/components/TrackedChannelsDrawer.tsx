@@ -246,17 +246,23 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
                     key={channel.id}
                     className="flex items-center gap-3 p-3 bg-[#0f0f0f] border border-[#272727] rounded-lg group hover:border-[#404040] transition-all"
                   >
-                    {channel.channel_thumbnail ? (
-                      <img
-                        src={channel.channel_thumbnail}
-                        alt={channel.channel_name || ''}
-                        className="w-9 h-9 rounded-full"
-                      />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full bg-[#272727] flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-full overflow-hidden bg-[#272727] flex items-center justify-center flex-shrink-0">
+                      {channel.channel_thumbnail ? (
+                        <img
+                          src={channel.channel_thumbnail}
+                          alt={channel.channel_name || ''}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const img = e.target as HTMLImageElement;
+                            img.style.display = 'none';
+                            img.parentElement?.querySelector('.fallback-icon')?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <div className={`fallback-icon ${channel.channel_thumbnail ? 'hidden' : ''}`}>
                         <Youtube className="w-4 h-4 text-[#666666]" />
                       </div>
-                    )}
+                    </div>
                     
                     <div className="flex-1 min-w-0">
                       <p className="text-white text-sm font-medium truncate">

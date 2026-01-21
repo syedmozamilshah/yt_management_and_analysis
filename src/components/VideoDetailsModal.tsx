@@ -266,28 +266,49 @@ export const VideoDetailsModal: React.FC<VideoDetailsModalProps> = ({
               <button
                 onClick={() => handleOpenAI('claude')}
                 disabled={isLoadingTranscript}
-                className="h-14 w-14 rounded-2xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 p-0 border-0 bg-white flex items-center justify-center"
+                className="h-14 w-14 rounded-2xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 p-0 border-0 bg-[#d4a574] flex items-center justify-center overflow-hidden"
                 title="Open in Claude"
               >
-                <img src="/logo/claude.png" alt="Claude" className="h-14 w-14 object-contain" />
+                <img 
+                  src="/logo/claude.png" 
+                  alt="Claude" 
+                  className="w-full h-full object-cover" 
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
               </button>
               
               <button
                 onClick={() => handleOpenAI('gemini')}
                 disabled={isLoadingTranscript}
-                className="h-14 w-14 rounded-2xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 p-0 border-0 bg-white flex items-center justify-center"
+                className="h-14 w-14 rounded-2xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 p-0 border-0 bg-[#4285f4] flex items-center justify-center overflow-hidden"
                 title="Open in Gemini"
               >
-                <img src="/logo/gemini.png" alt="Gemini" className="h-14 w-14 object-contain" />
+                <img 
+                  src="/logo/gemini.png" 
+                  alt="Gemini" 
+                  className="w-full h-full object-cover" 
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
               </button>
               
               <button
                 onClick={() => handleOpenAI('gpt')}
                 disabled={isLoadingTranscript}
-                className="h-14 w-14 rounded-2xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 p-0 border-0 bg-[#10a37f] flex items-center justify-center"
+                className="h-14 w-14 rounded-2xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 p-0 border-0 bg-[#10a37f] flex items-center justify-center overflow-hidden"
                 title="Open in ChatGPT"
               >
-                <img src="/logo/gpt.png" alt="ChatGPT" className="h-14 w-14 object-contain" />
+                <img 
+                  src="/logo/gpt.png" 
+                  alt="ChatGPT" 
+                  className="w-full h-full object-cover" 
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
               </button>
             </div>
           </div>

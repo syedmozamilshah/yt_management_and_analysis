@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { VideoCard } from './VideoCard';
 import { FilterBar } from './FilterBar';
 import { useToast } from '@/hooks/use-toast';
@@ -117,6 +117,37 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
       queryError 
     });
   }, [user?.id, isLoading, isFetching, videos.length, queryError]);
+
+  // Real-time subscription for new videos (e.g., when admin adds videos for all users)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('user-videos-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'user_videos',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Real-time: New video added', payload.new);
+          // Invalidate the query to refetch videos
+          queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
+          toast({
+            title: "New Video Added",
+            description: "A new video has been added to your ideation.",
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient, toast]);
 
   // Update filters when data changes
   React.useEffect(() => {
