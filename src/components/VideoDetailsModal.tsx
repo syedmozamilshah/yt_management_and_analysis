@@ -262,11 +262,11 @@ export const VideoDetailsModal: React.FC<VideoDetailsModalProps> = ({
                 {isLoadingTranscript ? 'Fetching Transcript...' : 'Copy Transcript'}
               </Button>
 
-              {/* AI Tool Buttons - Fixed size containers for consistent appearance */}
+              {/* AI Tool Buttons - Fixed size containers with black background */}
               <button
                 onClick={() => handleOpenAI('claude')}
                 disabled={isLoadingTranscript}
-                className="h-14 w-14 rounded-xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 border-0 flex items-center justify-center overflow-hidden bg-white"
+                className="h-14 w-14 rounded-xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 border-0 flex items-center justify-center overflow-hidden bg-[#1a1a1a]"
                 title="Open in Claude"
               >
                 <img src="/logo/claude.png" alt="Claude" className="h-10 w-10 object-contain" />
@@ -275,7 +275,7 @@ export const VideoDetailsModal: React.FC<VideoDetailsModalProps> = ({
               <button
                 onClick={() => handleOpenAI('gemini')}
                 disabled={isLoadingTranscript}
-                className="h-14 w-14 rounded-xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 border-0 flex items-center justify-center overflow-hidden bg-white"
+                className="h-14 w-14 rounded-xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 border-0 flex items-center justify-center overflow-hidden bg-[#1a1a1a]"
                 title="Open in Gemini"
               >
                 <img src="/logo/gemini.png" alt="Gemini" className="h-10 w-10 object-contain" />
@@ -284,7 +284,7 @@ export const VideoDetailsModal: React.FC<VideoDetailsModalProps> = ({
               <button
                 onClick={() => handleOpenAI('gpt')}
                 disabled={isLoadingTranscript}
-                className="h-14 w-14 rounded-xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 border-0 flex items-center justify-center overflow-hidden bg-white"
+                className="h-14 w-14 rounded-xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 border-0 flex items-center justify-center overflow-hidden bg-[#1a1a1a]"
                 title="Open in ChatGPT"
               >
                 <img src="/logo/gpt.png" alt="ChatGPT" className="h-10 w-10 object-contain" />
