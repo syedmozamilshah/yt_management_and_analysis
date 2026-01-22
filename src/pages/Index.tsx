@@ -101,7 +101,7 @@ const Index = () => {
                         </div>
                       )}
                     </div>
-                    <TrackedChannelsDrawer />
+                    <TrackedChannelsDrawer showAllUsers={shouldQueryAllData()} />
                   </div>
                 </div>
               </div>

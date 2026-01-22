@@ -26,10 +26,12 @@ interface TrackedChannel {
   channel_name: string | null;
   channel_thumbnail: string | null;
   is_global?: boolean;
+  user_id?: string;
 }
 
 interface TrackedChannelsDrawerProps {
   trigger?: React.ReactNode;
+  showAllUsers?: boolean;
 }
 
 type ToolType = 'claude' | 'gemini' | 'gpt';
@@ -46,7 +48,7 @@ const tools: Tool[] = [
   { id: 'gpt', name: 'ChatGPT', icon: '/logo/gpt.png' },
 ];
 
-export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ trigger }) => {
+export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ trigger, showAllUsers = false }) => {
   const { toast } = useToast();
   const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
@@ -66,11 +68,17 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('tracked_channels')
-        .select('id, channel_id, channel_name, channel_thumbnail, is_global')
-        .eq('user_id', user.id)
+        .select('id, channel_id, channel_name, channel_thumbnail, is_global, user_id')
         .order('created_at', { ascending: false });
+      
+      // If not showing all users data, filter by current user
+      if (!showAllUsers) {
+        query = query.eq('user_id', user.id);
+      }
+      
+      const { data, error } = await query;
 
       if (error) throw error;
       
@@ -82,7 +90,7 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
         }
       }
       const deduplicatedChannels = Array.from(channelMap.values());
-      console.log(`TrackedChannelsDrawer: Deduplicated ${data?.length || 0} -> ${deduplicatedChannels.length} channels`);
+      console.log(`TrackedChannelsDrawer: Deduplicated ${data?.length || 0} -> ${deduplicatedChannels.length} channels (showAllUsers: ${showAllUsers})`);
       
       setChannels(deduplicatedChannels);
     } catch (error) {
@@ -103,7 +111,7 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
       setPrompts(getAIPrompts());
       setEditingTool(null);
     }
-  }, [open, user?.id]);
+  }, [open, user?.id, showAllUsers]);
 
   // Real-time subscription for tracked_channels updates (when admin adds channels for all users)
   useEffect(() => {
