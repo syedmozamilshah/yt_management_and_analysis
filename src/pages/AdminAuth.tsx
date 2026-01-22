@@ -24,7 +24,7 @@ const AdminAuth = () => {
     
     // Redirect if already logged in as admin
     if (user && isAdmin) {
-      navigate('/admin/dashboard');
+      navigate('/index');
       return;
     }
     
@@ -72,7 +72,7 @@ const AdminAuth = () => {
             title: "Success",
             description: "Admin signed in successfully!"
           });
-          navigate('/admin/dashboard');
+          navigate('/index');
         } else {
           // Sign out non-admin users who try to login here
           await signOut();

@@ -39,9 +39,11 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
     queryKey: ['all-users-videos', refreshTrigger],
     queryFn: async () => {
       // Fetch all videos from user_videos without filtering by user_id
+      // Sort by upload_date (latest first), then by created_at as fallback
       const { data, error } = await (supabase as any)
         .from('user_videos')
         .select('*')
+        .order('upload_date', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false });
 
       if (error) {
