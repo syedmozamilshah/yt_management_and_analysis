@@ -11,15 +11,17 @@ interface NicheComboboxProps {
   onChange: (value: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  showAllUsers?: boolean;
 }
 
 export const NicheCombobox: React.FC<NicheComboboxProps> = ({ 
   value, 
   onChange, 
   disabled = false, 
-  placeholder = "Select or create a niche..." 
+  placeholder = "Select or create a niche...",
+  showAllUsers = false
 }) => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [niches, setNiches] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,11 +34,17 @@ export const NicheCombobox: React.FC<NicheComboboxProps> = ({
       
       setLoading(true);
       try {
-        const { data, error } = await (supabase as any)
+        let query = (supabase as any)
           .from('user_videos')
           .select('niche')
-          .eq('user_id', user.id)
           .not('niche', 'is', null);
+        
+        // If not showing all users data (or not admin), filter by user
+        if (!showAllUsers || !isAdmin) {
+          query = query.eq('user_id', user.id);
+        }
+        
+        const { data, error } = await query;
 
         if (error) throw error;
 
@@ -56,7 +64,7 @@ export const NicheCombobox: React.FC<NicheComboboxProps> = ({
     };
 
     fetchNiches();
-  }, [user?.id]);
+  }, [user?.id, showAllUsers, isAdmin]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

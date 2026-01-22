@@ -63,7 +63,7 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
   daysPeriod,
   onComplete
 }) => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, shouldQueryAllData } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [niche, setNiche] = useState('');
@@ -457,6 +457,7 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
               onChange={setNiche}
               disabled={isAddingVideos}
               placeholder="Select or create a niche..."
+              showAllUsers={shouldQueryAllData()}
             />
           </div>
 

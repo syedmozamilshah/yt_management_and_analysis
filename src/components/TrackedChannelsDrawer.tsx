@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Settings, Trash2, Youtube, Loader2, Sparkles, Save, RotateCcw, Pencil, X } from 'lucide-react';
+import { Settings, Trash2, Youtube, Loader2, Sparkles, Save, RotateCcw, Pencil, X, Globe } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -371,9 +371,7 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
                           {channel.channel_name || 'Unknown Channel'}
                         </p>
                         {channel.is_global && (
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 flex-shrink-0">
-                            Global
-                          </span>
+                          <Globe className="w-4 h-4 text-blue-400 flex-shrink-0" title="Global channel" />
                         )}
                       </div>
                     </div>
