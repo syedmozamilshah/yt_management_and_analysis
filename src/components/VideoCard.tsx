@@ -115,8 +115,14 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   };
 
   // Check if this is a viral video (views > subscribers)
-  const isViral = video.view_count && video.channel_subscribers && video.view_count > video.channel_subscribers;
+  // Only show viral badge if multiplier is >= 1.0 (views actually exceed subscribers)
+  // IMPORTANT: Convert to boolean to avoid React rendering "0" in JSX
+  const isViral = !!(video.view_count && video.channel_subscribers && 
+                  video.channel_subscribers > 0 && 
+                  video.view_count > video.channel_subscribers);
   const viralMultiplier = isViral ? (video.view_count! / video.channel_subscribers!).toFixed(1) : null;
+  // Don't show badge if multiplier rounds to 0 or is less than 1
+  const showViralBadge = isViral && viralMultiplier && parseFloat(viralMultiplier) >= 1.0;
 
   // Get viral badge styling based on multiplier - using exact hex colors
   const getViralBadgeStyle = (multiplier: string) => {
@@ -153,7 +159,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           <div className="flex-1 min-w-0 pl-3 flex flex-col justify-start">
             <div className="flex-1">
               <h4 className="text-sm font-medium leading-tight line-clamp-2 mb-1" style={{ color: '#f1f1f1' }}>
-                {isViral && viralMultiplier && (
+                {showViralBadge && viralMultiplier && (
                   <span 
                     className={`inline-block text-xs font-bold px-1.5 py-0.5 rounded mr-1.5 ${getViralBadgeStyle(viralMultiplier).className}`}
                     style={getViralBadgeStyle(viralMultiplier).style}
@@ -236,7 +242,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         <div className="px-0">
           {/* Title - YouTube typography with exact white color */}
           <h3 className="text-sm font-medium leading-tight line-clamp-2 mb-1 font-roboto" style={{ color: '#f1f1f1' }}>
-            {isViral && viralMultiplier && (
+            {showViralBadge && viralMultiplier && (
               <span 
                 className={`inline-block text-xs font-bold px-1.5 py-0.5 rounded mr-1.5 ${getViralBadgeStyle(viralMultiplier).className}`}
                 style={getViralBadgeStyle(viralMultiplier).style}

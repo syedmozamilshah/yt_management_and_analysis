@@ -84,12 +84,13 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
       
       // Debug: Log first few videos' upload_dates to see what we're getting
       if (allVideos.length > 0) {
-        console.log('UserVideoGrid: Sample video data:', allVideos.slice(0, 3).map((v: any) => ({
-          title: v.title?.substring(0, 30),
+        console.log('UserVideoGrid: Sample video data:', allVideos.slice(0, 5).map((v: any) => ({
+          id: v.id,
+          title: v.title,
+          title_starts_with_0: v.title?.startsWith('0'),
           upload_date: v.upload_date,
-          created_at: v.created_at,
+          view_count: v.view_count,
           channel_name: v.channel_name,
-          channel_subscribers: v.channel_subscribers,
           niche: v.niche
         })));
       }
