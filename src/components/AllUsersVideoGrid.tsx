@@ -101,12 +101,11 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
       }
       
       const deduplicatedVideos = Array.from(videoMap.values());
-      console.log(`AllUsersVideoGrid: Deduplicated ${transformedVideos.length} -> ${deduplicatedVideos.length} videos`);
       
       return deduplicatedVideos;
     },
-    staleTime: 0, // Always consider data stale
-    refetchOnMount: 'always', // Always refetch when component mounts (navigation)
+    staleTime: 60000, // Cache for 60 seconds
+    refetchOnMount: false, // Don't refetch on every mount
   });
 
   // Real-time subscription for new videos (when admin adds videos for all users)

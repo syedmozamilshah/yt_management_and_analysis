@@ -73,10 +73,8 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
         .select('id, channel_id, channel_name, channel_thumbnail, is_global, user_id')
         .order('created_at', { ascending: false });
       
-      // If not showing all users data, filter by current user
-      if (!showAllUsers) {
-        query = query.eq('user_id', user.id);
-      }
+      // Always filter by user_id (RLS enforces this anyway)
+      query = query.eq('user_id', user.id);
       
       const { data, error } = await query;
 
@@ -90,7 +88,6 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
         }
       }
       const deduplicatedChannels = Array.from(channelMap.values());
-      console.log(`TrackedChannelsDrawer: Deduplicated ${data?.length || 0} -> ${deduplicatedChannels.length} channels (showAllUsers: ${showAllUsers})`);
       
       setChannels(deduplicatedChannels);
     } catch (error) {

@@ -80,21 +80,6 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
         from += pageSize;
       }
 
-      console.log('UserVideoGrid: Query result', { count: allVideos.length });
-      
-      // Debug: Log first few videos' upload_dates to see what we're getting
-      if (allVideos.length > 0) {
-        console.log('UserVideoGrid: Sample video data:', allVideos.slice(0, 5).map((v: any) => ({
-          id: v.id,
-          title: v.title,
-          title_starts_with_0: v.title?.startsWith('0'),
-          upload_date: v.upload_date,
-          view_count: v.view_count,
-          channel_name: v.channel_name,
-          niche: v.niche
-        })));
-      }
-
       if (allVideos.length === 0) {
         return [];
       }
@@ -125,26 +110,14 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
       }
       
       const deduplicatedVideos = Array.from(videoMap.values());
-      console.log(`UserVideoGrid: Deduplicated ${transformedVideos.length} -> ${deduplicatedVideos.length} videos`);
       
       return deduplicatedVideos;
     },
     enabled: !!user?.id,
-    staleTime: 0, // Always consider data stale for fresh fetches
-    refetchOnMount: 'always', // Always refetch when component mounts
+    staleTime: 60000, // Cache for 60 seconds to avoid excessive refetches
+    refetchOnMount: false, // Don't refetch on every mount
     retry: 2,
   });
-
-  // Debug logging
-  React.useEffect(() => {
-    console.log('UserVideoGrid state:', { 
-      userId: user?.id, 
-      isLoading,
-      isFetching,
-      videosCount: videos.length,
-      queryError 
-    });
-  }, [user?.id, isLoading, isFetching, videos.length, queryError]);
 
   // Real-time subscription for new videos (e.g., when admin adds videos for all users)
   useEffect(() => {
