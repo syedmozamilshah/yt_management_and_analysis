@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/integrations/supabase/client"
+import { addTrackedChannel } from "@/services/channelTrackerService"
 import { ChannelAnalysisDialog } from "@/components/ChannelAnalysisDialog"
 
 interface ChannelData {
@@ -88,34 +88,19 @@ export function AppSidebar() {
     setIsAddingChannel(true);
     
     try {
-      // Use get-channel-videos API to get ALL videos for the selected period (not limited to RSS 15)
-      const { data, error } = await supabase.functions.invoke('get-channel-videos', {
-        body: { 
-          channelUrl,
-          daysPeriod: parseInt(daysPeriod)
-        }
-      });
-
-      if (error) throw error;
+      // Use RSS-based analyze-channel (free, no API quota) with time period filtering
+      const result = await addTrackedChannel(channelUrl, parseInt(daysPeriod));
       
       // Store channel data and close the first dialog
       setAnalyzedChannelData({
-        channel_id: data.channel_id,
-        channel_name: data.channelName,
-        channel_handle: data.channel_handle || null,
-        channel_thumbnail: data.channel_thumbnail || null,
-        channel_subscribers: data.subscriberCount,
-        videos_fetched: data.totalVideosFound || data.videos.length,
-        videos: data.videos.map((v: any) => ({
-          id: v.id,
-          video_id: v.id,
-          title: v.title,
-          thumbnail_url: v.thumbnailUrl,
-          published_at: v.uploadDate,
-          youtube_url: v.youtubeUrl,
-          view_count: v.viewCount
-        })),
-        rss_feed_url: `https://www.youtube.com/feeds/videos.xml?channel_id=${data.channel_id}`
+        channel_id: result.channel_id,
+        channel_name: result.channel_name,
+        channel_handle: result.channel_handle || null,
+        channel_thumbnail: result.channel_thumbnail || null,
+        channel_subscribers: result.channel_subscribers,
+        videos_fetched: result.videos_fetched,
+        videos: result.videos,
+        rss_feed_url: result.rss_feed_url
       });
       
       setAddChannelModalOpen(false);
