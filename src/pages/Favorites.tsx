@@ -34,19 +34,21 @@ const Favorites = () => {
   const { data: videos = [], isLoading: loading } = useQuery({
     queryKey: ['favorite-videos', user?.id, adminDataMode, shouldQueryAllData()],
     queryFn: async () => {
+      let data: Video[] | null = null;
+      
       if (shouldQueryAllData()) {
         // Admin in "all-data" mode: fetch ALL users' favorites from user_videos
-        const { data, error } = await (supabase as any)
+        const { data: fetchedData, error } = await (supabase as any)
           .from('user_videos')
           .select('*')
           .eq('is_favorite', true)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        return data as Video[] || [];
+        data = fetchedData;
       } else if (user?.id) {
         // Regular users OR admin in "my-data" mode: fetch from user_videos
-        const { data, error } = await (supabase as any)
+        const { data: fetchedData, error } = await (supabase as any)
           .from('user_videos')
           .select('*')
           .eq('user_id', user.id)
@@ -54,9 +56,21 @@ const Favorites = () => {
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        return data as Video[] || [];
+        data = fetchedData;
       }
-      return [];
+      
+      if (!data || data.length === 0) return [];
+      
+      // Deduplicate by video_id, keeping the entry with highest view count
+      const videoMap = new Map<string, Video>();
+      for (const video of data) {
+        const existing = videoMap.get(video.video_id);
+        if (!existing || (video.view_count || 0) > (existing.view_count || 0)) {
+          videoMap.set(video.video_id, video);
+        }
+      }
+      
+      return Array.from(videoMap.values());
     },
     enabled: !!user?.id || shouldQueryAllData(),
   });

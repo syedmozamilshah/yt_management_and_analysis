@@ -100,7 +100,7 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
       }
 
       // Transform user_videos to Video format
-      return allVideos.map((uv: any) => ({
+      const transformedVideos = allVideos.map((uv: any) => ({
         id: uv.id,
         title: uv.title,
         youtube_url: uv.youtube_url,
@@ -114,6 +114,20 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
         is_favorite: uv.is_favorite,
         created_at: uv.created_at,
       })) as Video[];
+
+      // Deduplicate by video_id, keeping the entry with highest view count
+      const videoMap = new Map<string, Video>();
+      for (const video of transformedVideos) {
+        const existing = videoMap.get(video.video_id);
+        if (!existing || (video.view_count || 0) > (existing.view_count || 0)) {
+          videoMap.set(video.video_id, video);
+        }
+      }
+      
+      const deduplicatedVideos = Array.from(videoMap.values());
+      console.log(`UserVideoGrid: Deduplicated ${transformedVideos.length} -> ${deduplicatedVideos.length} videos`);
+      
+      return deduplicatedVideos;
     },
     enabled: !!user?.id,
     staleTime: 0, // Always consider data stale for fresh fetches

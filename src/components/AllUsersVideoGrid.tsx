@@ -55,7 +55,7 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
       }
 
       // Transform user_videos to Video format
-      return (data || []).map((uv: any) => ({
+      const transformedVideos = (data || []).map((uv: any) => ({
         id: uv.id,
         title: uv.title,
         youtube_url: uv.youtube_url,
@@ -70,6 +70,20 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
         created_at: uv.created_at,
         user_id: uv.user_id, // Keep track of which user added it
       })) as Video[];
+
+      // Deduplicate by video_id, keeping the entry with highest view count
+      const videoMap = new Map<string, Video>();
+      for (const video of transformedVideos) {
+        const existing = videoMap.get(video.video_id);
+        if (!existing || (video.view_count || 0) > (existing.view_count || 0)) {
+          videoMap.set(video.video_id, video);
+        }
+      }
+      
+      const deduplicatedVideos = Array.from(videoMap.values());
+      console.log(`AllUsersVideoGrid: Deduplicated ${transformedVideos.length} -> ${deduplicatedVideos.length} videos`);
+      
+      return deduplicatedVideos;
     },
     staleTime: 0, // Always consider data stale
     refetchOnMount: 'always', // Always refetch when component mounts (navigation)
