@@ -69,10 +69,22 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
       const { data, error } = await supabase
         .from('tracked_channels')
         .select('id, channel_id, channel_name, channel_thumbnail, is_global')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setChannels(data || []);
+      
+      // Deduplicate by channel_id, keeping the first entry (most recent due to ordering)
+      const channelMap = new Map<string, TrackedChannel>();
+      for (const channel of (data || [])) {
+        if (!channelMap.has(channel.channel_id)) {
+          channelMap.set(channel.channel_id, channel);
+        }
+      }
+      const deduplicatedChannels = Array.from(channelMap.values());
+      console.log(`TrackedChannelsDrawer: Deduplicated ${data?.length || 0} -> ${deduplicatedChannels.length} channels`);
+      
+      setChannels(deduplicatedChannels);
     } catch (error) {
       console.error('Error fetching channels:', error);
       toast({
