@@ -156,7 +156,7 @@ export const VideoDetailsModal: React.FC<VideoDetailsModalProps> = ({
             <img
               src={video.thumbnail_url}
               alt={video.title}
-              className="w-full h-full object-contain bg-black"
+              className="w-full h-full object-cover bg-black"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f0f]/80 via-transparent to-transparent pointer-events-none" />
 

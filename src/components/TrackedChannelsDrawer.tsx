@@ -25,6 +25,7 @@ interface TrackedChannel {
   channel_id: string;
   channel_name: string | null;
   channel_thumbnail: string | null;
+  is_global?: boolean;
 }
 
 interface TrackedChannelsDrawerProps {
@@ -47,7 +48,7 @@ const tools: Tool[] = [
 
 export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ trigger }) => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [channels, setChannels] = useState<TrackedChannel[]>([]);
   const [loading, setLoading] = useState(false);
@@ -67,7 +68,7 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
     try {
       const { data, error } = await supabase
         .from('tracked_channels')
-        .select('id, channel_id, channel_name, channel_thumbnail')
+        .select('id, channel_id, channel_name, channel_thumbnail, is_global')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -108,6 +109,17 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
   const handleDeleteChannel = async () => {
     if (!deletingChannel) return;
     
+    // Check if this is a global channel and user is not admin
+    if (deletingChannel.is_global && !isAdmin) {
+      toast({
+        title: 'Cannot Delete',
+        description: 'This is a global channel added by admin. Only admins can delete it.',
+        variant: 'destructive'
+      });
+      setDeletingChannel(null);
+      return;
+    }
+    
     setIsDeleting(true);
     setDeleteTimer(30);
     try {
@@ -118,41 +130,66 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
         console.warn('Failed to unsubscribe from WebSub:', e);
       }
 
-      // Delete all tracked videos for this channel
-      const { error: videosError } = await supabase
-        .from('tracked_videos')
-        .delete()
-        .eq('channel_id', deletingChannel.channel_id);
+      // If admin is deleting a global channel, use the delete_global_channel function
+      if (deletingChannel.is_global && isAdmin) {
+        const { data: deleteResult, error: deleteError } = await supabase
+          .rpc('delete_global_channel', { p_channel_id: deletingChannel.channel_id });
+        
+        if (deleteError) {
+          console.error('Error deleting global channel:', deleteError);
+          throw deleteError;
+        }
+        
+        console.log('Global channel delete result:', deleteResult);
+        
+        toast({
+          title: 'Global Channel Deleted',
+          description: `${deletingChannel.channel_name || 'Channel'} has been removed from all users.`
+        });
+      } else {
+        // Regular user deleting their own (non-global) channel
+        
+        // Delete all tracked videos for this channel
+        const { error: videosError } = await supabase
+          .from('tracked_videos')
+          .delete()
+          .eq('channel_id', deletingChannel.channel_id);
 
-      if (videosError) {
-        console.warn('Error deleting tracked videos:', videosError);
-      }
+        if (videosError) {
+          console.warn('Error deleting tracked videos:', videosError);
+        }
 
-      // Delete videos from user_videos table (by channel name)
-      if (deletingChannel.channel_name) {
+        // Delete videos from user_videos table (by channel_id for accuracy)
         const { error: userVideosError } = await (supabase as any)
           .from('user_videos')
           .delete()
           .eq('user_id', user?.id)
-          .eq('channel_name', deletingChannel.channel_name);
+          .eq('channel_id', deletingChannel.channel_id);
 
         if (userVideosError) {
           console.warn('Error deleting user videos:', userVideosError);
         }
+
+        // Delete user channel subscription
+        await (supabase as any)
+          .from('user_channel_subscriptions')
+          .delete()
+          .eq('user_id', user?.id)
+          .eq('channel_id', deletingChannel.channel_id);
+
+        // Then delete the channel
+        const { error: channelError } = await supabase
+          .from('tracked_channels')
+          .delete()
+          .eq('id', deletingChannel.id);
+
+        if (channelError) throw channelError;
+
+        toast({
+          title: 'Channel Deleted',
+          description: `${deletingChannel.channel_name || 'Channel'} and all its videos have been removed.`
+        });
       }
-
-      // Then delete the channel
-      const { error: channelError } = await supabase
-        .from('tracked_channels')
-        .delete()
-        .eq('id', deletingChannel.id);
-
-      if (channelError) throw channelError;
-
-      toast({
-        title: 'Channel Deleted',
-        description: `${deletingChannel.channel_name || 'Channel'} and all its videos have been removed.`
-      });
 
       // Refresh the list and invalidate video queries for instant UI update
       setChannels(prev => prev.filter(c => c.id !== deletingChannel.id));
@@ -265,16 +302,28 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-medium truncate">
-                        {channel.channel_name || 'Unknown Channel'}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-white text-sm font-medium truncate">
+                          {channel.channel_name || 'Unknown Channel'}
+                        </p>
+                        {channel.is_global && (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 flex-shrink-0">
+                            Global
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => setDeletingChannel(channel)}
-                      className="opacity-0 group-hover:opacity-100 text-[#888888] hover:text-red-500 hover:bg-red-500/10 transition-all h-8 w-8"
+                      className={`opacity-0 group-hover:opacity-100 transition-all h-8 w-8 ${
+                        channel.is_global && !isAdmin 
+                          ? 'text-[#444444] cursor-not-allowed' 
+                          : 'text-[#888888] hover:text-red-500 hover:bg-red-500/10'
+                      }`}
+                      title={channel.is_global && !isAdmin ? 'Only admins can delete global channels' : 'Delete channel'}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

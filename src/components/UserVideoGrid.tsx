@@ -81,6 +81,18 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
       }
 
       console.log('UserVideoGrid: Query result', { count: allVideos.length });
+      
+      // Debug: Log first few videos' upload_dates to see what we're getting
+      if (allVideos.length > 0) {
+        console.log('UserVideoGrid: Sample video data:', allVideos.slice(0, 3).map((v: any) => ({
+          title: v.title?.substring(0, 30),
+          upload_date: v.upload_date,
+          created_at: v.created_at,
+          channel_name: v.channel_name,
+          channel_subscribers: v.channel_subscribers,
+          niche: v.niche
+        })));
+      }
 
       if (allVideos.length === 0) {
         return [];
@@ -149,6 +161,33 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
       supabase.removeChannel(channel);
     };
   }, [user?.id, queryClient, toast]);
+
+  // One-time metadata refresh to fix channel_subscribers, niche, upload_date etc.
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const refreshMetadata = async () => {
+      try {
+        console.log('Refreshing video metadata for user (fixing timestamps, niches)...');
+        const { data, error } = await (supabase as any).rpc('refresh_user_video_metadata', {
+          p_user_id: user.id
+        });
+        if (error) {
+          console.error('Error refreshing metadata:', error);
+        } else {
+          console.log('Metadata refresh complete, updated rows:', data);
+          // Refetch videos to get updated data
+          queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
+        }
+      } catch (err) {
+        console.error('Failed to refresh metadata:', err);
+      }
+    };
+
+    // Always run on component mount to ensure data is correct
+    // This fixes timestamps, niches, and other metadata
+    refreshMetadata();
+  }, [user?.id, queryClient]);
 
   // Poll for new videos every 30 seconds while page is open
   // This triggers the server-side RSS polling to catch new uploads quickly

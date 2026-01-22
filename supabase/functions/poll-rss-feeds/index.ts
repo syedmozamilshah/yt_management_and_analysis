@@ -41,6 +41,16 @@ function parseAtomEntry(xml: string): {
   const publishedMatch = xml.match(/<published>([^<]+)<\/published>/i)
   if (publishedMatch) {
     result.publishedAt = publishedMatch[1].trim()
+    console.log(`Parsed published date: ${result.publishedAt}`)
+  } else {
+    // Try alternative formats
+    const pubMatch = xml.match(/<pubDate>([^<]+)<\/pubDate>/i)
+    if (pubMatch) {
+      result.publishedAt = pubMatch[1].trim()
+      console.log(`Parsed pubDate: ${result.publishedAt}`)
+    } else {
+      console.warn(`No published date found in entry for video: ${result.videoId}`)
+    }
   }
 
   const linkMatch = xml.match(/<link[^>]*href="([^"]+)"[^>]*>/i)
@@ -232,13 +242,21 @@ serve(async (req: Request) => {
           const youtubeUrl = entry.link || `https://www.youtube.com/watch?v=${entry.videoId}`
           const thumbnailUrl = `https://i.ytimg.com/vi/${entry.videoId}/hqdefault.jpg`
 
+          // CRITICAL: Use the RSS published date, warn if falling back to now()
+          let publishedAt = entry.publishedAt
+          if (!publishedAt) {
+            console.warn(`WARNING: No published date for video ${entry.videoId}, using current time`)
+            publishedAt = new Date().toISOString()
+          }
+          console.log(`Video ${entry.videoId} published at: ${publishedAt}`)
+
           const newVideo: NewVideo = {
             videoId: entry.videoId,
             channelId: entry.channelId,
             title: entry.title || 'Untitled',
             thumbnailUrl,
             youtubeUrl,
-            publishedAt: entry.publishedAt || new Date().toISOString(),
+            publishedAt,
             channelName: channel.channel_name
           }
 

@@ -13,8 +13,20 @@ export const formatNumber = (num: number | null | undefined): string => {
 
 export const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
+  
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    console.warn('Invalid date string:', dateString);
+    return 'Unknown date';
+  }
+  
   const now = new Date();
   const diffInMs = now.getTime() - date.getTime();
+  
+  // Handle future dates (shouldn't happen but just in case)
+  if (diffInMs < 0) {
+    return 'just now';
+  }
   
   const minutes = Math.floor(diffInMs / (1000 * 60));
   const hours = Math.floor(diffInMs / (1000 * 60 * 60));

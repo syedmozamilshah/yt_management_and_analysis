@@ -244,6 +244,14 @@ serve(async (req: Request) => {
           console.log('View count fetched:', viewCount)
 
           // Insert new video WITH view count
+          // CRITICAL: Use the RSS published date, not now()
+          const publishedAt = entry.publishedAt
+          if (!publishedAt) {
+            console.warn(`WARNING: No published date for video ${entry.videoId}, skipping to avoid wrong timestamp`)
+            continue
+          }
+          console.log(`Inserting video ${entry.videoId} with published_at: ${publishedAt}`)
+          
           const { error: insertError } = await supabase
             .from('tracked_videos')
             .insert({
@@ -252,7 +260,7 @@ serve(async (req: Request) => {
               title: entry.title || 'Untitled',
               thumbnail_url: thumbnailUrl,
               youtube_url: youtubeUrl,
-              published_at: entry.publishedAt || new Date().toISOString(),
+              published_at: publishedAt,
               view_count: viewCount,
               view_count_updated_at: viewCount !== null ? new Date().toISOString() : null,
               source: 'websub'

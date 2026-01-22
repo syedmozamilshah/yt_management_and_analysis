@@ -170,6 +170,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               
               <div className="text-xs" style={{ color: '#aaaaaa' }}>
                 {formatNumber(video.view_count || 0)} views • {video.upload_date ? formatDate(video.upload_date) : 'Unknown date'}
+                {/* Debug: {video.upload_date?.substring(0, 30)} */}
               </div>
             </div>
             
