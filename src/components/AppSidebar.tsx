@@ -206,9 +206,10 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-lg font-bold mb-4 px-2 flex items-center justify-start">
-            <img src="/Blow_me_ai.png" alt="Blow Me AI" className="h-16 w-auto" />
-          </SidebarGroupLabel>
+          {/* Logo - aligned with Add Channel button */}
+          <div className="px-2 mb-4">
+            <img src="/Blow_me_ai.png" alt="Blow Me AI" className="h-14 w-auto" />
+          </div>
           {/* Add Channel Button - Top of sidebar */}
           <div className="px-2 mb-3">
             <Dialog open={addChannelModalOpen} onOpenChange={setAddChannelModalOpen}>
