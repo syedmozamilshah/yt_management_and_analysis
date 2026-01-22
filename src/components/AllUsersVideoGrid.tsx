@@ -39,25 +39,43 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
     queryKey: ['all-users-videos', refreshTrigger],
     queryFn: async () => {
       // Fetch all videos from user_videos without filtering by user_id
-      // Sort by upload_date (latest first), then by created_at as fallback
-      const { data, error } = await (supabase as any)
-        .from('user_videos')
-        .select('*')
-        .order('upload_date', { ascending: false, nullsFirst: false })
-        .order('created_at', { ascending: false });
+      // Use pagination to get ALL videos (Supabase default limit is 1000)
+      let allVideos: any[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      
+      while (true) {
+        const { data, error } = await (supabase as any)
+          .from('user_videos')
+          .select('*')
+          .order('upload_date', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false })
+          .range(from, from + pageSize - 1);
 
-      if (error) {
-        console.error('Error fetching all users videos:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load videos from all users",
-          variant: "destructive"
-        });
-        return [];
+        if (error) {
+          console.error('Error fetching all users videos:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load videos from all users",
+            variant: "destructive"
+          });
+          return [];
+        }
+
+        if (!data || data.length === 0) break;
+        
+        allVideos = [...allVideos, ...data];
+        
+        // If we got less than pageSize, we've reached the end
+        if (data.length < pageSize) break;
+        
+        from += pageSize;
       }
+      
+      console.log(`AllUsersVideoGrid: Fetched ${allVideos.length} total videos`);
 
       // Transform user_videos to Video format
-      const transformedVideos = (data || []).map((uv: any) => ({
+      const transformedVideos = allVideos.map((uv: any) => ({
         id: uv.id,
         title: uv.title,
         youtube_url: uv.youtube_url,
@@ -90,6 +108,30 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
     staleTime: 0, // Always consider data stale
     refetchOnMount: 'always', // Always refetch when component mounts (navigation)
   });
+
+  // Real-time subscription for new videos (when admin adds videos for all users)
+  React.useEffect(() => {
+    const userVideosChannel = supabase
+      .channel('all-users-videos-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'user_videos',
+        },
+        (payload) => {
+          console.log('Admin Real-time: New video added', payload.new);
+          // Invalidate the query to refetch all videos
+          queryClient.invalidateQueries({ queryKey: ['all-users-videos'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(userVideosChannel);
+    };
+  }, [queryClient]);
 
   // Poll for new videos every 30 seconds while page is open (admin view)
   React.useEffect(() => {

@@ -93,6 +93,50 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
     }
   }, [open, user?.id]);
 
+  // Real-time subscription for tracked_channels updates (when admin adds channels for all users)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const trackedChannelsSubscription = supabase
+      .channel('tracked-channels-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'tracked_channels',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Real-time: New tracked channel added', payload.new);
+          // Refetch channels if drawer is open
+          if (open) {
+            fetchChannels();
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'tracked_channels',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Real-time: Tracked channel deleted', payload.old);
+          if (open) {
+            fetchChannels();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(trackedChannelsSubscription);
+    };
+  }, [user?.id, open]);
+
   // Timer effect for deletion countdown
   React.useEffect(() => {
     let interval: NodeJS.Timeout | null = null;

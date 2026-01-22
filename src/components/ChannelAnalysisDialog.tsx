@@ -256,8 +256,10 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
             });
         }
 
-        // Invalidate the videos query to refresh
+        // Invalidate queries to refresh all views
         queryClient.invalidateQueries({ queryKey: ['user-videos'] });
+        queryClient.invalidateQueries({ queryKey: ['all-users-videos'] });
+        queryClient.invalidateQueries({ queryKey: ['tracked-channels'] });
 
         toast({
           title: "✅ Added for All Users!",
