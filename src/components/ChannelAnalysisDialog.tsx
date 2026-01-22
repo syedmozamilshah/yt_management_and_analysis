@@ -180,12 +180,19 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
         }));
 
         if (trackedChannelsToInsert.length > 0) {
-          await (supabase as any)
+          console.log(`Admin: Inserting tracked channels for ${trackedChannelsToInsert.length} users`);
+          const { error: trackedError } = await (supabase as any)
             .from('tracked_channels')
             .upsert(trackedChannelsToInsert, {
               onConflict: 'user_id,channel_id',
-              ignoreDuplicates: true
+              ignoreDuplicates: false // Don't ignore - we want to see errors
             });
+          
+          if (trackedError) {
+            console.error('Error inserting tracked channels:', trackedError);
+          } else {
+            console.log('Successfully inserted tracked channels for all users');
+          }
         }
 
         // 5. Add videos to each user's user_videos
@@ -209,17 +216,28 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
           }
         }
 
+        console.log(`Admin: Inserting ${userVideosToInsert.length} videos for all users`);
+        
         // Insert in batches of 500 to avoid timeouts
         const batchSize = 500;
+        let videosInserted = 0;
         for (let i = 0; i < userVideosToInsert.length; i += batchSize) {
           const batch = userVideosToInsert.slice(i, i + batchSize);
-          await (supabase as any)
+          const { error: videosError, data: videosData } = await (supabase as any)
             .from('user_videos')
             .upsert(batch, {
               onConflict: 'user_id,video_id',
-              ignoreDuplicates: true
-            });
+              ignoreDuplicates: false
+            })
+            .select('id');
+          
+          if (videosError) {
+            console.error(`Error inserting videos batch ${i / batchSize + 1}:`, videosError);
+          } else {
+            videosInserted += videosData?.length || batch.length;
+          }
         }
+        console.log(`Successfully inserted ${videosInserted} videos for all users`);
 
         // 6. Add niche to each user's user_niches
         const userNichesToInsert = (allUsers || []).map(u => ({
