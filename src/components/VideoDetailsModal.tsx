@@ -262,32 +262,32 @@ export const VideoDetailsModal: React.FC<VideoDetailsModalProps> = ({
                 {isLoadingTranscript ? 'Fetching Transcript...' : 'Copy Transcript'}
               </Button>
 
-              {/* AI Tool Buttons - Using PNG logos */}
+              {/* AI Tool Buttons - Fixed size containers for consistent appearance */}
               <button
                 onClick={() => handleOpenAI('claude')}
                 disabled={isLoadingTranscript}
-                className="h-14 w-14 rounded-2xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 p-0 border-0 flex items-center justify-center overflow-hidden"
+                className="h-14 w-14 rounded-xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 border-0 flex items-center justify-center overflow-hidden bg-white"
                 title="Open in Claude"
               >
-                <img src="/logo/claude.png" alt="Claude" className="w-full h-full object-cover rounded-2xl" />
+                <img src="/logo/claude.png" alt="Claude" className="h-10 w-10 object-contain" />
               </button>
               
               <button
                 onClick={() => handleOpenAI('gemini')}
                 disabled={isLoadingTranscript}
-                className="h-14 w-14 rounded-2xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 p-0 border-0 flex items-center justify-center overflow-hidden"
+                className="h-14 w-14 rounded-xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 border-0 flex items-center justify-center overflow-hidden bg-white"
                 title="Open in Gemini"
               >
-                <img src="/logo/gemini.png" alt="Gemini" className="w-full h-full object-cover rounded-2xl" />
+                <img src="/logo/gemini.png" alt="Gemini" className="h-10 w-10 object-contain" />
               </button>
               
               <button
                 onClick={() => handleOpenAI('gpt')}
                 disabled={isLoadingTranscript}
-                className="h-14 w-14 rounded-2xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 p-0 border-0 flex items-center justify-center overflow-hidden"
+                className="h-14 w-14 rounded-xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 border-0 flex items-center justify-center overflow-hidden bg-white"
                 title="Open in ChatGPT"
               >
-                <img src="/logo/gpt.png" alt="ChatGPT" className="w-full h-full object-cover rounded-2xl" />
+                <img src="/logo/gpt.png" alt="ChatGPT" className="h-10 w-10 object-contain" />
               </button>
             </div>
           </div>
