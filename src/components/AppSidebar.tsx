@@ -205,13 +205,13 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarContent>
-        <SidebarGroup className="px-2">
-          {/* Logo - no extra padding, inherit from SidebarGroup */}
-          <div className="py-1 mb-1">
+        <SidebarGroup>
+          {/* Logo - perfectly aligned with Add Channel button */}
+          <div className="pl-2 pr-0 py-1 mb-1">
             <img src="/Blow_me_ai.png" alt="Blow Me AI" className="h-16 w-auto" />
           </div>
           {/* Add Channel Button - Top of sidebar */}
-          <div className="mb-3">
+          <div className="px-2 mb-3">
             <Dialog open={addChannelModalOpen} onOpenChange={setAddChannelModalOpen}>
                 <DialogTrigger asChild>
                   <Button
