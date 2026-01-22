@@ -262,53 +262,38 @@ export const VideoDetailsModal: React.FC<VideoDetailsModalProps> = ({
                 {isLoadingTranscript ? 'Fetching Transcript...' : 'Copy Transcript'}
               </Button>
 
-              {/* AI Tool Buttons - Fixed equal size */}
+              {/* AI Tool Buttons - Fixed equal size with SVG icons for instant loading */}
               <button
                 onClick={() => handleOpenAI('claude')}
                 disabled={isLoadingTranscript}
-                className="h-14 w-14 rounded-2xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 p-0 border-0 bg-[#d4a574] flex items-center justify-center overflow-hidden"
+                className="h-14 w-14 rounded-2xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 p-0 border-0 bg-[#d4a574] flex items-center justify-center text-white"
                 title="Open in Claude"
               >
-                <img 
-                  src="/logo/claude.png" 
-                  alt="Claude" 
-                  className="w-full h-full object-cover" 
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
+                <svg viewBox="0 0 24 24" className="w-8 h-8" fill="currentColor">
+                  <path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128-2.252-.166-3.156-.462c-.293.848-.462 1.751-.497 2.677l1.186.956zm.08 1.058l-.985-.796a9.063 9.063 0 0 0 .337 1.95l.648.317V15.96v1.054zm.304 2.396l.064.122.017.009a9.103 9.103 0 0 0 1.469 1.931l.095-.51-.095-.544-1.307-.798-.243-.21zm2.096 2.584c.235.184.479.357.732.518l.631-.397-.15-.556-.57-.413-.643.848zm1.594.995c.311.155.63.295.958.417l.353-.466-.23-.513-.637-.159-.444.72zm2.006.667l.038.008a9.129 9.129 0 0 0 1.032.175l.118-.523-.332-.436-.596.07-.26.706zm2.195.23a9.054 9.054 0 0 0 1.093-.063l-.149-.56-.467-.295-.547.287.07.631zm2.095-.301c.323-.078.64-.174.95-.285l-.383-.443-.515-.104-.39.41.338.422zm1.86-.632a8.981 8.981 0 0 0 .855-.435l-.558-.287-.484.118-.152.437.339.167zm1.643-.915c.25-.177.49-.368.72-.57l-.672-.089-.414.261.02.42.346-.022zm1.366-1.175a9.022 9.022 0 0 0 .572-.618l-.722.119-.31.356.15.36.31-.217zm1.052-1.319c.161-.232.312-.472.451-.719l-.715.295-.181.406.28.26.165-.242zm.789-1.537c.103-.266.194-.538.271-.814l-.652.418-.044.412.36.13.065-.146zm.442-1.727a9.17 9.17 0 0 0 .085-.844l-.533.482.083.382.365.04v-.06zm.085-1.76a9.073 9.073 0 0 0-.102-.863l-.37.517.181.342.291.064v-.06zm-.322-1.713a9.01 9.01 0 0 0-.286-.815l-.181.53.261.27.206.015zm-.614-1.584a9.108 9.108 0 0 0-.464-.75l.042.534.311.182.111.034zm-.947-1.428a9.057 9.057 0 0 0-.625-.658l.248.5.318.075.059.083zm-1.252-1.235a9.068 9.068 0 0 0-.765-.546l.427.434.276-.015.062.127zm-1.516-1.006a9.154 9.154 0 0 0-.876-.417l.566.334.206-.064.104.147zm-1.734-.744a9.048 9.048 0 0 0-.958-.274l.656.208.129-.077.173.143zm-1.904-.455a9.144 9.144 0 0 0-1.008-.118l.698.058.052-.061.258.121zm-2.023-.142h-.078a9.15 9.15 0 0 0-1.014.05l.688-.089-.025-.041.43.08zm-2.08.14a9.128 9.128 0 0 0-.98.198l.619-.186-.078-.059.439.047z"/>
+                </svg>
               </button>
               
               <button
                 onClick={() => handleOpenAI('gemini')}
                 disabled={isLoadingTranscript}
-                className="h-14 w-14 rounded-2xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 p-0 border-0 bg-[#4285f4] flex items-center justify-center overflow-hidden"
+                className="h-14 w-14 rounded-2xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 p-0 border-0 bg-[#4285f4] flex items-center justify-center text-white"
                 title="Open in Gemini"
               >
-                <img 
-                  src="/logo/gemini.png" 
-                  alt="Gemini" 
-                  className="w-full h-full object-cover" 
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
+                <svg viewBox="0 0 24 24" className="w-8 h-8" fill="currentColor">
+                  <path d="M12 0a12 12 0 1 0 12 12A12.013 12.013 0 0 0 12 0zm0 2a10 10 0 1 1-10 10A10.011 10.011 0 0 1 12 2zm-1 4v4H7v2h4v4h2v-4h4v-2h-4V6z"/>
+                </svg>
               </button>
               
               <button
                 onClick={() => handleOpenAI('gpt')}
                 disabled={isLoadingTranscript}
-                className="h-14 w-14 rounded-2xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 p-0 border-0 bg-[#10a37f] flex items-center justify-center overflow-hidden"
+                className="h-14 w-14 rounded-2xl shadow-lg transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 p-0 border-0 bg-[#10a37f] flex items-center justify-center text-white"
                 title="Open in ChatGPT"
               >
-                <img 
-                  src="/logo/gpt.png" 
-                  alt="ChatGPT" 
-                  className="w-full h-full object-cover" 
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
+                <svg viewBox="0 0 24 24" className="w-8 h-8" fill="currentColor">
+                  <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364l2.0201-1.1685a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/>
+                </svg>
               </button>
             </div>
           </div>
