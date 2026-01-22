@@ -206,8 +206,8 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-lg font-bold mb-4 px-2 flex items-center gap-2">
-            <img src="/Blow_me_ai.png" alt="Blow Me AI" className="h-12 w-auto" />
+          <SidebarGroupLabel className="text-lg font-bold mb-4 px-2 flex items-center justify-start">
+            <img src="/Blow_me_ai.png" alt="Blow Me AI" className="h-16 w-auto" />
           </SidebarGroupLabel>
           {/* Add Channel Button - Top of sidebar */}
           <div className="px-2 mb-3">

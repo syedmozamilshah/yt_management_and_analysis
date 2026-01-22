@@ -150,7 +150,8 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
   useEffect(() => {
     if (!user?.id) return;
 
-    const channel = supabase
+    // Subscribe to user_videos table for this user
+    const userVideosChannel = supabase
       .channel('user-videos-realtime')
       .on(
         'postgres_changes',
@@ -170,10 +171,59 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
           });
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_videos',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Real-time: Video updated', payload.new);
+          queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'user_videos',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Real-time: Video deleted', payload.old);
+          queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
+        }
+      )
+      .subscribe((status) => {
+        console.log('Real-time subscription status:', status);
+      });
+
+    // Also subscribe to tracked_videos for new channel uploads (global)
+    const trackedVideosChannel = supabase
+      .channel('tracked-videos-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'tracked_videos',
+        },
+        (payload) => {
+          console.log('Real-time: New tracked video', payload.new);
+          // Refetch user videos as the trigger should have synced it
+          setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
+          }, 1000); // Small delay to allow trigger to complete
+        }
+      )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(userVideosChannel);
+      supabase.removeChannel(trackedVideosChannel);
     };
   }, [user?.id, queryClient, toast]);
 
