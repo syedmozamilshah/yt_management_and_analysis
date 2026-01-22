@@ -206,9 +206,9 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          {/* Logo - left aligned with Add Channel button, compact spacing */}
-          <div className="px-2 py-2 mb-2">
-            <img src="/Blow_me_ai.png" alt="Blow Me AI" className="h-14 w-auto" />
+          {/* Logo - minimal spacing, left aligned with Add Channel button */}
+          <div className="px-2 py-1 mb-1">
+            <img src="/Blow_me_ai.png" alt="Blow Me AI" className="h-16 w-auto" />
           </div>
           {/* Add Channel Button - Top of sidebar */}
           <div className="px-2 mb-3">
