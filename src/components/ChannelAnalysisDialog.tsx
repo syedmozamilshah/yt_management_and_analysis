@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,6 +20,8 @@ import {
 } from 'lucide-react';
 import { formatNumber } from '@/utils/formatNumbers';
 import { NicheCombobox } from '@/components/NicheCombobox';
+
+export type TabType = 'usa' | 'spanish';
 
 interface ChannelData {
   channel_id: string;
@@ -54,6 +58,7 @@ interface ChannelAnalysisDialogProps {
   channelData: ChannelData | null;
   daysPeriod: number;
   onComplete: () => void;
+  tabType?: TabType;
 }
 
 export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
@@ -61,7 +66,8 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
   onOpenChange,
   channelData,
   daysPeriod,
-  onComplete
+  onComplete,
+  tabType: initialTabType = 'usa'
 }) => {
   const { user, isAdmin, shouldQueryAllData } = useAuth();
   const { toast } = useToast();
@@ -69,20 +75,26 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
   const [niche, setNiche] = useState('');
   const [isAddingVideos, setIsAddingVideos] = useState(false);
   const [addingMode, setAddingMode] = useState<'personal' | 'global' | null>(null);
+  // For admin, allow tab selection; for regular users, use the tab they're on
+  const [selectedTabType, setSelectedTabType] = useState<TabType>(initialTabType);
 
   // Use videos from channelData directly (fetched via RSS)
   const videos = channelData?.videos || [];
   const videosLoaded = videos.length > 0 || (channelData && channelData.videos_fetched === 0);
   const isLoadingVideos = false; // Videos are already loaded from RSS
 
-  // Reset state when dialog closes
+  // Reset state when dialog closes or tabType changes
   React.useEffect(() => {
     if (!open) {
       setNiche('');
       setIsAddingVideos(false);
       setAddingMode(null);
+      setSelectedTabType(initialTabType);
     }
-  }, [open]);
+  }, [open, initialTabType]);
+
+  // Get the tab type to use (admin can override, regular users use the passed tabType)
+  const getTabType = () => isAdmin ? selectedTabType : initialTabType;
 
   const handleAddVideos = async (mode: 'personal' | 'global' = 'personal') => {
     if (!user?.id || !channelData || !niche.trim()) {
@@ -131,6 +143,7 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
 
       if (mode === 'global' && isAdmin) {
         // Admin adding for all users - add to ALL users' tracked_channels, user_videos, and user_niches
+        const tabTypeToUse = getTabType();
         
         // 1. First, add the channel to admin_global_channels (triggers auto-sync to all users)
         const { error: globalChannelError } = await (supabase as any)
@@ -141,6 +154,7 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
             channel_thumbnail: channelData.channel_thumbnail,
             channel_subscribers: channelData.channel_subscribers,
             niche: niche.trim(),
+            tab_type: tabTypeToUse,
             is_active: true,
             updated_at: new Date().toISOString()
           }, {
@@ -168,7 +182,7 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
 
         if (usersError) throw usersError;
 
-        // 4. Add tracked channel for each user
+        // 4. Add tracked channel for each user with tab_type
         const trackedChannelsToInsert = (allUsers || []).map(u => ({
           user_id: u.id,
           channel_id: channelData.channel_id,
@@ -176,15 +190,16 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
           channel_handle: channelData.channel_handle,
           channel_thumbnail: channelData.channel_thumbnail,
           channel_subscribers: channelData.channel_subscribers,
+          tab_type: tabTypeToUse,
           is_global: true
         }));
 
         if (trackedChannelsToInsert.length > 0) {
-          console.log(`Admin: Inserting tracked channels for ${trackedChannelsToInsert.length} users`);
+          console.log(`Admin: Inserting tracked channels for ${trackedChannelsToInsert.length} users with tab_type=${tabTypeToUse}`);
           const { error: trackedError } = await (supabase as any)
             .from('tracked_channels')
             .upsert(trackedChannelsToInsert, {
-              onConflict: 'user_id,channel_id',
+              onConflict: 'user_id,channel_id,tab_type',
               ignoreDuplicates: false // Don't ignore - we want to see errors
             });
           
@@ -195,7 +210,7 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
           }
         }
 
-        // 5. Add videos to each user's user_videos
+        // 5. Add videos to each user's user_videos with tab_type
         const userVideosToInsert: any[] = [];
         for (const u of (allUsers || [])) {
           for (const video of videos) {
@@ -211,12 +226,13 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
               upload_date: video.published_at,
               view_count: viewCountsMap[video.video_id] ?? video.view_count ?? 0,
               niche: niche.trim(),
+              tab_type: tabTypeToUse,
               is_global: true
             });
           }
         }
 
-        console.log(`Admin: Inserting ${userVideosToInsert.length} videos for all users`);
+        console.log(`Admin: Inserting ${userVideosToInsert.length} videos for all users with tab_type=${tabTypeToUse}`);
         
         // Insert in batches of 500 to avoid timeouts
         const batchSize = 500;
@@ -255,11 +271,12 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
             });
         }
 
-        // 7. Add channel subscription for auto-syncing future videos to all users
+        // 7. Add channel subscription for auto-syncing future videos to all users with tab_type
         const channelSubsToInsert = (allUsers || []).map(u => ({
           user_id: u.id,
           channel_id: channelData.channel_id,
           niche: niche.trim(),
+          tab_type: tabTypeToUse,
           is_active: true,
           is_global: true,
           updated_at: new Date().toISOString()
@@ -269,22 +286,23 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
           await (supabase as any)
             .from('user_channel_subscriptions')
             .upsert(channelSubsToInsert, {
-              onConflict: 'user_id,channel_id',
+              onConflict: 'user_id,channel_id,tab_type',
               ignoreDuplicates: true
             });
         }
 
-        // Invalidate queries to refresh all views
+        // Invalidate queries to refresh all views for this tab
         queryClient.invalidateQueries({ queryKey: ['user-videos'] });
-        queryClient.invalidateQueries({ queryKey: ['all-users-videos'] });
+        queryClient.invalidateQueries({ queryKey: ['all-users-videos', tabTypeToUse] });
         queryClient.invalidateQueries({ queryKey: ['tracked-channels'] });
 
         toast({
           title: "✅ Added for All Users!",
-          description: `Successfully added ${videos.length} videos to ALL ${allUsers?.length || 0} users. Future videos will be auto-added.`
+          description: `Successfully added ${videos.length} videos to ALL ${allUsers?.length || 0} users in ${tabTypeToUse.toUpperCase()} tab. Future videos will be auto-added.`
         });
       } else {
-        // Regular user or admin personal mode - add to user_videos
+        // Regular user or admin personal mode - add to user_videos with tab_type
+        const tabTypeToUse = getTabType();
         const videosToInsert = videos.map(video => ({
           user_id: user.id,
           title: video.title,
@@ -296,7 +314,8 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
           channel_subscribers: channelData.channel_subscribers,
           upload_date: video.published_at,
           view_count: viewCountsMap[video.video_id] ?? video.view_count ?? 0,
-          niche: niche.trim()
+          niche: niche.trim(),
+          tab_type: tabTypeToUse
         }));
 
         const { error } = await (supabase as any)
@@ -305,17 +324,34 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
 
         if (error) throw error;
 
-        // Save the channel-niche subscription for auto-syncing future videos
+        // Add tracked channel for this user
+        await (supabase as any)
+          .from('tracked_channels')
+          .upsert({
+            user_id: user.id,
+            channel_id: channelData.channel_id,
+            channel_name: channelData.channel_name,
+            channel_handle: channelData.channel_handle,
+            channel_thumbnail: channelData.channel_thumbnail,
+            channel_subscribers: channelData.channel_subscribers,
+            tab_type: tabTypeToUse,
+            is_global: false
+          }, {
+            onConflict: 'user_id,channel_id,tab_type'
+          });
+
+        // Save the channel-niche subscription for auto-syncing future videos with tab_type
         await (supabase as any)
           .from('user_channel_subscriptions')
           .upsert({
             user_id: user.id,
             channel_id: channelData.channel_id,
             niche: niche.trim(),
+            tab_type: tabTypeToUse,
             is_active: true,
             updated_at: new Date().toISOString()
           }, {
-            onConflict: 'user_id,channel_id'
+            onConflict: 'user_id,channel_id,tab_type'
           });
 
         // Update user activity to mark them as active
@@ -330,12 +366,13 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
             onConflict: 'user_id'
           });
 
-        // Invalidate queries to refresh the ideation page
-        queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
+        // Invalidate queries to refresh the page for this tab
+        queryClient.invalidateQueries({ queryKey: ['user-videos', user.id, tabTypeToUse] });
+        queryClient.invalidateQueries({ queryKey: ['tracked-channels'] });
 
         toast({
           title: "✅ Videos Added!",
-          description: `Successfully added ${videos.length} video${videos.length > 1 ? 's' : ''} to your ideation board. Future videos from this channel will be auto-added.`
+          description: `Successfully added ${videos.length} video${videos.length > 1 ? 's' : ''} to your ${tabTypeToUse.toUpperCase()} tab. Future videos from this channel will be auto-added.`
         });
       }
 
@@ -461,6 +498,22 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
             />
           </div>
 
+          {/* Tab Selection for Admin */}
+          {isAdmin && (
+            <div className="space-y-2">
+              <Label className="text-[#aaaaaa]">Add to Tab</Label>
+              <Select value={selectedTabType} onValueChange={(value: TabType) => setSelectedTabType(value)}>
+                <SelectTrigger className="bg-[#0f0f0f] border-[#cc0000] text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#181818] border-[#272727]">
+                  <SelectItem value="usa">USA</SelectItem>
+                  <SelectItem value="spanish">Spanish</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Add Videos Buttons */}
           {isAdmin ? (
             <div className="space-y-3">
@@ -472,12 +525,12 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
                 {isAddingVideos && addingMode === 'global' ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Adding for All Users...
+                    Adding for All Users to {selectedTabType.toUpperCase()}...
                   </>
                 ) : (
                   <>
                     <Globe className="w-4 h-4 mr-2" />
-                    Add for All Users ({videoCount} Videos)
+                    Add for All Users to {selectedTabType.toUpperCase()} ({videoCount} Videos)
                   </>
                 )}
               </Button>
@@ -490,12 +543,12 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
                 {isAddingVideos && addingMode === 'personal' ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Adding to Your Ideation...
+                    Adding to Your {selectedTabType.toUpperCase()} Tab...
                   </>
                 ) : (
                   <>
                     <User className="w-4 h-4 mr-2" />
-                    Add to Your Ideation Only
+                    Add to Your {selectedTabType.toUpperCase()} Tab Only
                   </>
                 )}
               </Button>
@@ -514,7 +567,7 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
               ) : (
                 <>
                   <Plus className="w-4 h-4 mr-2" />
-                  Add {videoCount} Video{videoCount !== 1 ? 's' : ''} to Ideation
+                  Add {videoCount} Video{videoCount !== 1 ? 's' : ''}
                 </>
               )}
             </Button>
@@ -522,8 +575,8 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
 
           <p className="text-xs text-[#666666] text-center">
             {isAdmin 
-              ? "Add for all users to make videos visible globally, or add to your personal ideation board."
-              : "Videos will be added to your Ideation page with the selected niche"
+              ? `Videos will be added to the ${selectedTabType.toUpperCase()} tab. Add for all users to make videos visible globally, or add to your personal tab.`
+              : `Videos will be added to your ${initialTabType.toUpperCase()} tab with the selected niche`
             }
           </p>
         </div>

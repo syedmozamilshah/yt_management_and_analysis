@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { VideoCard } from './VideoCard';
 import { FilterBar } from './FilterBar';
 import { useToast } from '@/hooks/use-toast';
@@ -19,11 +19,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+export type TabType = 'usa' | 'spanish';
+
 interface AllUsersVideoGridProps {
   refreshTrigger?: number;
+  tabType?: TabType;
 }
 
-export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTrigger = 0 }) => {
+export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTrigger = 0, tabType = 'usa' }) => {
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [selectedVideos, setSelectedVideos] = useState<Set<string>>(new Set());
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -34,23 +37,62 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch ALL users' videos from user_videos table (admin only)
+  // Reset filters when tab changes
+  useEffect(() => {
+    setFilters(defaultFilters);
+    setSelectedVideos(new Set());
+    setIsSelectionMode(false);
+  }, [tabType]);
+
+  // Fetch ALL users' videos from user_videos table (admin only) for specific tab
   const { data: videos = [], isLoading, refetch } = useQuery({
-    queryKey: ['all-users-videos', refreshTrigger],
+    queryKey: ['all-users-videos', tabType, refreshTrigger],
     queryFn: async () => {
-      // Fetch all videos from user_videos without filtering by user_id
-      // Use pagination to get ALL videos (Supabase default limit is 1000)
+      // Fetch all videos from user_videos for the specific tab
       let allVideos: any[] = [];
       let from = 0;
       const pageSize = 1000;
+      let tabTypeColumnExists = true;
       
       while (true) {
-        const { data, error } = await (supabase as any)
-          .from('user_videos')
-          .select('*')
-          .order('upload_date', { ascending: false, nullsFirst: false })
-          .order('created_at', { ascending: false })
-          .range(from, from + pageSize - 1);
+        let data, error;
+        
+        // Try with tab_type filter first
+        if (tabTypeColumnExists) {
+          const result = await (supabase as any)
+            .from('user_videos')
+            .select('*')
+            .eq('tab_type', tabType)
+            .order('upload_date', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false })
+            .range(from, from + pageSize - 1);
+          
+          data = result.data;
+          error = result.error;
+          
+          // If error (column doesn't exist), try without filter
+          if (error && error.message?.includes('tab_type')) {
+            console.warn('AllUsersVideoGrid: tab_type column not found, fetching without filter');
+            tabTypeColumnExists = false;
+            const fallbackResult = await (supabase as any)
+              .from('user_videos')
+              .select('*')
+              .order('upload_date', { ascending: false, nullsFirst: false })
+              .order('created_at', { ascending: false })
+              .range(from, from + pageSize - 1);
+            data = fallbackResult.data;
+            error = fallbackResult.error;
+          }
+        } else {
+          const result = await (supabase as any)
+            .from('user_videos')
+            .select('*')
+            .order('upload_date', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false })
+            .range(from, from + pageSize - 1);
+          data = result.data;
+          error = result.error;
+        }
 
         if (error) {
           console.error('Error fetching all users videos:', error);
@@ -72,7 +114,7 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
         from += pageSize;
       }
       
-      console.log(`AllUsersVideoGrid: Fetched ${allVideos.length} total videos`);
+      console.log(`AllUsersVideoGrid: Fetched ${allVideos.length} total videos for tab ${tabType}`);
 
       // Transform user_videos to Video format
       const transformedVideos = allVideos.map((uv: any) => ({
@@ -111,7 +153,7 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
   // Real-time subscription for new videos (when admin adds videos for all users)
   React.useEffect(() => {
     const userVideosChannel = supabase
-      .channel('all-users-videos-realtime')
+      .channel(`all-users-videos-realtime-${tabType}`)
       .on(
         'postgres_changes',
         {
@@ -119,10 +161,12 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
           schema: 'public',
           table: 'user_videos',
         },
-        (payload) => {
-          console.log('Admin Real-time: New video added', payload.new);
-          // Invalidate the query to refetch all videos
-          queryClient.invalidateQueries({ queryKey: ['all-users-videos'] });
+        (payload: any) => {
+          // Only refresh if video belongs to current tab (or if tab_type column doesn't exist)
+          if (!payload.new?.tab_type || payload.new?.tab_type === tabType) {
+            console.log('Admin Real-time: New video added for tab', tabType, payload.new);
+            queryClient.invalidateQueries({ queryKey: ['all-users-videos', tabType] });
+          }
         }
       )
       .subscribe();
@@ -130,7 +174,7 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
     return () => {
       supabase.removeChannel(userVideosChannel);
     };
-  }, [queryClient]);
+  }, [queryClient, tabType]);
 
   // Poll for new videos every 30 seconds while page is open (admin view)
   React.useEffect(() => {

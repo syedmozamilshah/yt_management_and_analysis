@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -15,7 +16,8 @@ import {
   XCircle,
   Loader2,
   RefreshCw,
-  CheckSquare
+  CheckSquare,
+  Search
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -47,6 +49,7 @@ const UserManagement: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     userId: string;
@@ -88,6 +91,7 @@ const UserManagement: React.FC = () => {
   // Clear selection when tab changes
   useEffect(() => {
     setSelectedUsers(new Set());
+    setSearchQuery('');
   }, [activeTab]);
 
   const updateUserStatus = async (userId: string, newStatus: 'approved' | 'blocked' | 'pending') => {
@@ -224,13 +228,25 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  // Filter users based on active tab
+  // Filter users based on active tab and search query
   const filteredUsers = users.filter(user => {
     if (user.is_admin) return false; // Don't show admin in user management
-    if (activeTab === 'new') return user.user_status === 'pending';
-    if (activeTab === 'approved') return user.user_status === 'approved';
-    if (activeTab === 'blocked') return user.user_status === 'blocked';
-    return false;
+    
+    // Tab filter
+    let tabMatch = false;
+    if (activeTab === 'new') tabMatch = user.user_status === 'pending';
+    else if (activeTab === 'approved') tabMatch = user.user_status === 'approved';
+    else if (activeTab === 'blocked') tabMatch = user.user_status === 'blocked';
+    
+    if (!tabMatch) return false;
+    
+    // Search filter - case insensitive email search
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      return user.email?.toLowerCase().includes(query) || false;
+    }
+    
+    return true;
   });
 
   const pendingCount = users.filter(u => u.user_status === 'pending' && !u.is_admin).length;
@@ -335,6 +351,25 @@ const UserManagement: React.FC = () => {
         </Button>
       </div>
 
+      {/* Search Input */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#666666]" />
+        <Input
+          placeholder="Search by email address..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10 bg-[#181818] border-[#272727] text-white placeholder:text-[#666666] focus:border-[#cc0000] focus:ring-[#cc0000]/20"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#666666] hover:text-white"
+          >
+            ×
+          </button>
+        )}
+      </div>
+
       {/* Bulk Action Bar */}
       {selectedUsers.size > 0 && (
         <div className="flex items-center justify-between bg-[#1a1a2e] p-4 rounded-xl border border-[#272727]">
@@ -384,14 +419,21 @@ const UserManagement: React.FC = () => {
         ) : filteredUsers.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 rounded-full bg-[#272727] flex items-center justify-center mx-auto mb-4">
-              {activeTab === 'new' ? (
+              {searchQuery ? (
+                <Search className="w-8 h-8 text-[#666666]" />
+              ) : activeTab === 'new' ? (
                 <Clock className="w-8 h-8 text-[#666666]" />
               ) : (
                 <Users className="w-8 h-8 text-[#666666]" />
               )}
             </div>
             <p className="text-[#888888]">
-              {activeTab === 'new' ? 'No pending user requests' : 'No users found'}
+              {searchQuery 
+                ? `No users found matching "${searchQuery}"` 
+                : activeTab === 'new' 
+                  ? 'No pending user requests' 
+                  : 'No users found'
+              }
             </p>
           </div>
         ) : (

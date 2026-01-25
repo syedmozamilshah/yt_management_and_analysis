@@ -27,112 +27,37 @@ import {
   Tags,
   Users,
   Sparkles,
-  ChevronDown,
-  Plus,
-  Search,
-  Rss,
-  Loader2
+  ChevronDown
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useState } from "react"
-import { useToast } from "@/hooks/use-toast"
-import { addTrackedChannel } from "@/services/channelTrackerService"
-import { ChannelAnalysisDialog } from "@/components/ChannelAnalysisDialog"
-
-interface ChannelData {
-  channel_id: string;
-  channel_name: string;
-  channel_handle: string | null;
-  channel_thumbnail: string | null;
-  channel_subscribers: number;
-  videos_fetched?: number;
-  videos?: Array<{
-    id: string;
-    video_id: string;
-    title: string;
-    thumbnail_url: string | null;
-    published_at: string;
-    youtube_url: string | null;
-    view_count: number | null;
-  }>;
-  rss_feed_url?: string;
-}
 
 export function AppSidebar() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, isAdmin, signOut, adminDataMode, setAdminDataMode } = useAuth()
-  const { toast } = useToast()
-  const [addChannelModalOpen, setAddChannelModalOpen] = useState(false)
-  const [channelUrl, setChannelUrl] = useState('')
-  const [daysPeriod, setDaysPeriod] = useState('7')
-  const [isAddingChannel, setIsAddingChannel] = useState(false)
-  const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false)
-  const [analyzedChannelData, setAnalyzedChannelData] = useState<ChannelData | null>(null)
 
-  const handleAnalyzeChannel = async () => {
-    if (!channelUrl.trim()) return;
-    
-    setIsAddingChannel(true);
-    
-    try {
-      // Use RSS-based analyze-channel (free, no API quota) with time period filtering
-      const result = await addTrackedChannel(channelUrl, parseInt(daysPeriod));
-      
-      // Store channel data and close the first dialog
-      setAnalyzedChannelData({
-        channel_id: result.channel_id,
-        channel_name: result.channel_name,
-        channel_handle: result.channel_handle || null,
-        channel_thumbnail: result.channel_thumbnail || null,
-        channel_subscribers: result.channel_subscribers,
-        videos_fetched: result.videos_fetched,
-        videos: result.videos,
-        rss_feed_url: result.rss_feed_url
-      });
-      
-      setAddChannelModalOpen(false);
-      // Open the analysis dialog instead of navigating
-      setAnalysisDialogOpen(true);
-    } catch (error: any) {
-      console.error('Error adding channel:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add channel. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsAddingChannel(false);
-    }
-  }
-
-  const handleAnalysisComplete = () => {
-    // Reset form state
-    setChannelUrl('');
-    setDaysPeriod('7');
-    setAnalyzedChannelData(null);
-    // Navigate to ideation page to show the added videos
-    navigate('/');
-  }
-
-  // Menu items - Reorganized sidebar
+  // Menu items - Reorganized sidebar with USA and Spanish tabs
   const mainItems = [
     {
-      title: "Ideation",
-      url: "/",
-      icon: Lightbulb,
+      title: "USA",
+      url: "/?tab=usa",
+      icon: null,
+      emoji: "🇺🇸",
+    },
+    {
+      title: "Spanish",
+      url: "/?tab=spanish",
+      icon: null,
+      emoji: "🇪🇸",
     },
   ]
 
@@ -181,6 +106,10 @@ export function AppSidebar() {
       
       if (currentPath === itemPath) {
         for (const [key, value] of params.entries()) {
+          // Special case: USA tab should be active when on / with no tab param
+          if (key === 'tab' && value === 'usa' && !currentParams.get('tab')) {
+            return true;
+          }
           if (currentParams.get(key) === value) {
             return true;
           }
@@ -206,71 +135,9 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          {/* Logo - perfectly aligned with Add Channel button */}
+          {/* Logo */}
           <div className="pl-2 pr-0 py-1 mb-1">
             <img src="/blow_me_ai.png" alt="Blow Me AI" className="h-16 w-auto" />
-          </div>
-          {/* Add Channel Button - Top of sidebar */}
-          <div className="px-2 mb-3">
-            <Dialog open={addChannelModalOpen} onOpenChange={setAddChannelModalOpen}>
-                <DialogTrigger asChild>
-                  <Button
-                    className="w-full bg-[#cc0000] hover:bg-[#aa0000] text-white flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Channel
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="bg-[#181818] border border-[#272727] text-white sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle className="text-white flex items-center gap-2">
-                      <Users className="w-5 h-5 text-[#cc0000]" />
-                      Add Channel
-                    </DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    <div className="space-y-2">
-                      <Label className="text-[#aaaaaa]">Channel URL or Handle</Label>
-                      <Input
-                        value={channelUrl}
-                        onChange={(e) => setChannelUrl(e.target.value)}
-                        placeholder="@channelname or youtube.com/..."
-                        className="bg-[#0f0f0f] border-[#272727] text-white placeholder:text-[#666666]"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-[#aaaaaa]">Time Period</Label>
-                      <Select value={daysPeriod} onValueChange={setDaysPeriod}>
-                        <SelectTrigger className="bg-[#0f0f0f] border-[#cc0000] text-white">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-[#181818] border-[#272727]">
-                          <SelectItem value="7">Last 7 days</SelectItem>
-                          <SelectItem value="28">Last 28 days</SelectItem>
-                          <SelectItem value="90">Last 90 days</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button
-                      onClick={handleAnalyzeChannel}
-                      disabled={!channelUrl.trim() || isAddingChannel}
-                      className="w-full bg-[#cc0000] hover:bg-[#aa0000] text-white"
-                    >
-                      {isAddingChannel ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Adding Channel...
-                        </>
-                      ) : (
-                        <>
-                          <Search className="w-4 h-4 mr-2" />
-                          Analyze Channel
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </DialogContent>
-            </Dialog>
           </div>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -287,7 +154,11 @@ export function AppSidebar() {
                       onClick={() => handleNavigation(item.url)}
                     >
                       <div className="flex items-center gap-3 w-full">
-                        <item.icon className="w-5 h-5" />
+                        {item.emoji ? (
+                          <span className="text-lg w-5 h-5 flex items-center justify-center">{item.emoji}</span>
+                        ) : item.icon ? (
+                          <item.icon className="w-5 h-5" />
+                        ) : null}
                         <span>{item.title}</span>
                       </div>
                     </SidebarMenuButton>
@@ -434,15 +305,6 @@ export function AppSidebar() {
           </div>
         </SidebarFooter>
       )}
-
-      {/* Channel Analysis Dialog */}
-      <ChannelAnalysisDialog
-        open={analysisDialogOpen}
-        onOpenChange={setAnalysisDialogOpen}
-        channelData={analyzedChannelData}
-        daysPeriod={parseInt(daysPeriod)}
-        onComplete={handleAnalysisComplete}
-      />
     </Sidebar>
   )
 }

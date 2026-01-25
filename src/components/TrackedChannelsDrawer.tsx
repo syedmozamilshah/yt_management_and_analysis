@@ -20,6 +20,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+export type TabType = 'usa' | 'spanish';
+
 interface TrackedChannel {
   id: string;
   channel_id: string;
@@ -27,11 +29,13 @@ interface TrackedChannel {
   channel_thumbnail: string | null;
   is_global?: boolean;
   user_id?: string;
+  tab_type?: string;
 }
 
 interface TrackedChannelsDrawerProps {
   trigger?: React.ReactNode;
   showAllUsers?: boolean;
+  tabType?: TabType;
 }
 
 type ToolType = 'claude' | 'gemini' | 'gpt';
@@ -48,7 +52,7 @@ const tools: Tool[] = [
   { id: 'gpt', name: 'ChatGPT', icon: '/logo/gpt.png' },
 ];
 
-export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ trigger, showAllUsers = false }) => {
+export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ trigger, showAllUsers = false, tabType = 'usa' }) => {
   const { toast } = useToast();
   const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
@@ -58,31 +62,38 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
   const [deletingChannel, setDeletingChannel] = useState<TrackedChannel | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteTimer, setDeleteTimer] = useState(30);
+  const [showAdminChannelWarning, setShowAdminChannelWarning] = useState<TrackedChannel | null>(null);
   
   // AI Prompts state
   const [prompts, setPrompts] = useState(DEFAULT_AI_PROMPTS);
   const [editingTool, setEditingTool] = useState<ToolType | null>(null);
 
   const fetchChannels = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
     
     setLoading(true);
     try {
-      let query = supabase
+      // Fetch channels for this user
+      const { data, error } = await supabase
         .from('tracked_channels')
-        .select('id, channel_id, channel_name, channel_thumbnail, is_global, user_id')
+        .select('id, channel_id, channel_name, channel_thumbnail, is_global, user_id, tab_type')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-      
-      // Always filter by user_id (RLS enforces this anyway)
-      query = query.eq('user_id', user.id);
-      
-      const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching channels:', error);
+        throw error;
+      }
+      
+      // Filter by tabType if tab_type column exists
+      const filteredData = data?.filter(channel => !channel.tab_type || channel.tab_type === tabType) || [];
       
       // Deduplicate by channel_id, keeping the first entry (most recent due to ordering)
       const channelMap = new Map<string, TrackedChannel>();
-      for (const channel of (data || [])) {
+      for (const channel of filteredData) {
         if (!channelMap.has(channel.channel_id)) {
           channelMap.set(channel.channel_id, channel);
         }
@@ -97,6 +108,7 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
         description: 'Failed to load tracked channels',
         variant: 'destructive'
       });
+      setChannels([]); // Clear channels on error
     } finally {
       setLoading(false);
     }
@@ -108,14 +120,14 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
       setPrompts(getAIPrompts());
       setEditingTool(null);
     }
-  }, [open, user?.id, showAllUsers]);
+  }, [open, user?.id, showAllUsers, tabType]);
 
   // Real-time subscription for tracked_channels updates (when admin adds channels for all users)
   useEffect(() => {
     if (!user?.id) return;
 
     const trackedChannelsSubscription = supabase
-      .channel('tracked-channels-realtime')
+      .channel(`tracked-channels-realtime-${tabType}`)
       .on(
         'postgres_changes',
         {
@@ -124,11 +136,13 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
           table: 'tracked_channels',
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
-          console.log('Real-time: New tracked channel added', payload.new);
-          // Refetch channels if drawer is open
-          if (open) {
-            fetchChannels();
+        (payload: any) => {
+          // Only refresh if channel belongs to current tab
+          if (payload.new?.tab_type === tabType) {
+            console.log('Real-time: New tracked channel added for tab', tabType, payload.new);
+            if (open) {
+              fetchChannels();
+            }
           }
         }
       )
@@ -152,7 +166,7 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
     return () => {
       supabase.removeChannel(trackedChannelsSubscription);
     };
-  }, [user?.id, open]);
+  }, [user?.id, open, tabType]);
 
   // Timer effect for deletion countdown
   React.useEffect(() => {
@@ -169,17 +183,6 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
 
   const handleDeleteChannel = async () => {
     if (!deletingChannel) return;
-    
-    // Check if this is a global channel and user is not admin
-    if (deletingChannel.is_global && !isAdmin) {
-      toast({
-        title: 'Cannot Delete',
-        description: 'This is a global channel added by admin. Only admins can delete it.',
-        variant: 'destructive'
-      });
-      setDeletingChannel(null);
-      return;
-    }
     
     setIsDeleting(true);
     setDeleteTimer(30);
@@ -220,23 +223,25 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
           console.warn('Error deleting tracked videos:', videosError);
         }
 
-        // Delete videos from user_videos table (by channel_id for accuracy)
+        // Delete videos from user_videos table (by channel_id and tab_type for accuracy)
         const { error: userVideosError } = await (supabase as any)
           .from('user_videos')
           .delete()
           .eq('user_id', user?.id)
-          .eq('channel_id', deletingChannel.channel_id);
+          .eq('channel_id', deletingChannel.channel_id)
+          .eq('tab_type', tabType);
 
         if (userVideosError) {
           console.warn('Error deleting user videos:', userVideosError);
         }
 
-        // Delete user channel subscription
+        // Delete user channel subscription for this tab
         await (supabase as any)
           .from('user_channel_subscriptions')
           .delete()
           .eq('user_id', user?.id)
-          .eq('channel_id', deletingChannel.channel_id);
+          .eq('channel_id', deletingChannel.channel_id)
+          .eq('tab_type', tabType);
 
         // Then delete the channel
         const { error: channelError } = await supabase
@@ -248,13 +253,14 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
 
         toast({
           title: 'Channel Deleted',
-          description: `${deletingChannel.channel_name || 'Channel'} and all its videos have been removed.`
+          description: `${deletingChannel.channel_name || 'Channel'} and all its videos have been removed from ${tabType.toUpperCase()} tab.`
         });
       }
 
       // Refresh the list and invalidate video queries for instant UI update
       setChannels(prev => prev.filter(c => c.id !== deletingChannel.id));
-      queryClient.invalidateQueries({ queryKey: ['user-videos'] });
+      queryClient.invalidateQueries({ queryKey: ['user-videos', user?.id, tabType] });
+      queryClient.invalidateQueries({ queryKey: ['all-users-videos', tabType] });
       setDeletingChannel(null);
     } catch (error) {
       console.error('Error deleting channel:', error);
@@ -290,6 +296,8 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
     setEditingTool(null);
   };
 
+  const tabDisplayName = tabType === 'usa' ? 'USA' : 'Spanish';
+
   return (
     <>
       <Sheet open={open} onOpenChange={setOpen}>
@@ -299,7 +307,7 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
               variant="ghost"
               size="icon"
               className="text-[#aaaaaa] hover:text-white hover:bg-[#272727] transition-all duration-200"
-              title="Settings"
+              title={`${tabDisplayName} Settings`}
             >
               <Settings className="w-5 h-5" />
             </Button>
@@ -312,8 +320,8 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
                 <Settings className="w-5 h-5 text-white" />
               </div>
               <div>
-                <span className="text-lg font-semibold">Settings</span>
-                <p className="text-sm font-normal text-[#888888]">Manage channels & AI prompts</p>
+                <span className="text-lg font-semibold">{tabDisplayName} Settings</span>
+                <p className="text-sm font-normal text-[#888888]">Manage channels & AI prompts for {tabDisplayName}</p>
               </div>
             </SheetTitle>
           </SheetHeader>
@@ -322,7 +330,7 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
           <div className="mt-6">
             <div className="flex items-center gap-2 mb-3">
               <Youtube className="w-5 h-5 text-[#cc0000]" />
-              <h3 className="text-white font-medium">Tracked Channels</h3>
+              <h3 className="text-white font-medium">Tracked Channels ({tabDisplayName})</h3>
             </div>
             
             <div className="space-y-2">
@@ -333,9 +341,9 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
               ) : channels.length === 0 ? (
                 <div className="text-center py-6 bg-[#0f0f0f] rounded-lg border border-[#272727]">
                   <Youtube className="w-8 h-8 text-[#272727] mx-auto mb-2" />
-                  <p className="text-[#888888] text-sm">No tracked channels yet</p>
+                  <p className="text-[#888888] text-sm">No tracked channels for {tabDisplayName} yet</p>
                   <p className="text-xs text-[#666666] mt-1">
-                    Add channels from the sidebar
+                    Add channels using the button above
                   </p>
                 </div>
               ) : (
@@ -376,7 +384,14 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setDeletingChannel(channel)}
+                      onClick={() => {
+                        // If it's an admin-added channel and user is not admin, show warning
+                        if (channel.is_global && !isAdmin) {
+                          setShowAdminChannelWarning(channel);
+                        } else {
+                          setDeletingChannel(channel);
+                        }
+                      }}
                       className={`opacity-0 group-hover:opacity-100 transition-all h-8 w-8 ${
                         channel.is_global && !isAdmin 
                           ? 'text-[#444444] cursor-not-allowed' 
@@ -525,6 +540,33 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
               <Loader2 className="w-6 h-6 text-[#cc0000] animate-spin" />
             </div>
           )}
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Admin Channel Warning Dialog */}
+      <AlertDialog open={!!showAdminChannelWarning} onOpenChange={(open) => {
+        if (!open) setShowAdminChannelWarning(null);
+      }}>
+        <AlertDialogContent className="bg-[#181818] border-[#272727]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white flex items-center gap-2">
+              <Globe className="w-5 h-5 text-[#cc0000]" />
+              Cannot Delete Admin Channel
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-[#aaaaaa]">
+              <span className="text-white font-medium">{showAdminChannelWarning?.channel_name || 'This channel'}</span> was added by an administrator and cannot be deleted by users.
+              <br /><br />
+              If you need this channel removed, please contact an administrator.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              onClick={() => setShowAdminChannelWarning(null)}
+              className="bg-[#272727] hover:bg-[#333333] text-white border-[#404040]"
+            >
+              Understood
+            </AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>

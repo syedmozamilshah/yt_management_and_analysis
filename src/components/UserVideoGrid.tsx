@@ -22,11 +22,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+export type TabType = 'usa' | 'spanish';
+
 interface UserVideoGridProps {
   refreshTrigger?: number;
+  tabType?: TabType;
 }
 
-export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0 }) => {
+export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0, tabType = 'usa' }) => {
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [selectedVideos, setSelectedVideos] = useState<Set<string>>(new Set());
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -38,34 +41,91 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const updateDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const lastUpdateTimeRef = useRef<number>(0);
 
-  // Fetch user's personal videos
+  // Debounced refetch to prevent update loops - only refetch max once per 5 seconds
+  const debouncedRefetch = useCallback(() => {
+    const now = Date.now();
+    if (now - lastUpdateTimeRef.current < 5000) {
+      // Skip if we just refetched
+      return;
+    }
+    
+    if (updateDebounceRef.current) {
+      clearTimeout(updateDebounceRef.current);
+    }
+    
+    updateDebounceRef.current = setTimeout(() => {
+      lastUpdateTimeRef.current = Date.now();
+      queryClient.invalidateQueries({ queryKey: ['user-videos', user?.id, tabType] });
+    }, 2000); // Wait 2 seconds before refetching to batch updates
+  }, [queryClient, user?.id, tabType]);
+
+  // Reset filters when tab changes
+  useEffect(() => {
+    setFilters(defaultFilters);
+    setSelectedVideos(new Set());
+    setIsSelectionMode(false);
+  }, [tabType]);
+
+  // Fetch user's personal videos for the specific tab
   const { data: videos = [], isLoading, isFetching, refetch, error: queryError } = useQuery({
-    queryKey: ['user-videos', user?.id, refreshTrigger],
+    queryKey: ['user-videos', user?.id, tabType, refreshTrigger],
     queryFn: async () => {
       if (!user?.id) {
         console.log('UserVideoGrid: No user ID, returning empty array');
         return [];
       }
       
-      console.log('UserVideoGrid: Fetching videos for user:', user.id);
+      console.log('UserVideoGrid: Fetching videos for user:', user.id, 'tab:', tabType);
       
-      // Fetch all videos without limit - Supabase returns max 1000 by default
-      // For users with 800+ videos, we may need pagination in the future
+      // Fetch all videos for the specific tab
       let allVideos: any[] = [];
       let from = 0;
       const pageSize = 1000;
       
       while (true) {
-        const { data, error } = await (supabase as any)
+        // First try with tab_type filter (after migration)
+        let query = (supabase as any)
           .from('user_videos')
-          .select('id, title, youtube_url, video_id, thumbnail_url, channel_name, channel_subscribers, upload_date, view_count, niche, is_favorite, created_at')
-          .eq('user_id', user.id)
+          .select('id, title, youtube_url, video_id, thumbnail_url, channel_name, channel_subscribers, upload_date, view_count, niche, is_favorite, created_at, tab_type')
+          .eq('user_id', user.id);
+        
+        // Try to filter by tab_type - if column doesn't exist, we'll catch the error
+        query = query.eq('tab_type', tabType);
+        
+        query = query
           .order('upload_date', { ascending: false, nullsFirst: false })
           .order('created_at', { ascending: false })
           .range(from, from + pageSize - 1);
+        
+        const { data, error } = await query;
 
         if (error) {
+          // If the error is about tab_type column not existing, fall back to fetching all videos
+          if (error.message?.includes('tab_type') || error.code === '42703' || error.message?.includes('column')) {
+            console.warn('tab_type column not found, fetching all videos (migration may not be run yet)');
+            // Fetch without tab_type filter
+            const { data: fallbackData, error: fallbackError } = await (supabase as any)
+              .from('user_videos')
+              .select('id, title, youtube_url, video_id, thumbnail_url, channel_name, channel_subscribers, upload_date, view_count, niche, is_favorite, created_at')
+              .eq('user_id', user.id)
+              .order('upload_date', { ascending: false, nullsFirst: false })
+              .order('created_at', { ascending: false })
+              .range(from, from + pageSize - 1);
+            
+            if (fallbackError) {
+              console.error('Error fetching user videos (fallback):', fallbackError);
+              throw fallbackError;
+            }
+            
+            if (!fallbackData || fallbackData.length === 0) break;
+            allVideos = [...allVideos, ...fallbackData];
+            if (fallbackData.length < pageSize) break;
+            from += pageSize;
+            continue;
+          }
           console.error('Error fetching user videos:', error);
           throw error;
         }
@@ -123,9 +183,10 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
   useEffect(() => {
     if (!user?.id) return;
 
-    // Subscribe to user_videos table for this user
+    // Subscribe to user_videos table for this user and tab
+    const channelName = `user-videos-realtime-${tabType}`;
     const userVideosChannel = supabase
-      .channel('user-videos-realtime')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -134,14 +195,16 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
           table: 'user_videos',
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
-          console.log('Real-time: New video added', payload.new);
-          // Invalidate the query to refetch videos
-          queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
-          toast({
-            title: "New Video Added",
-            description: "A new video has been added to your ideation.",
-          });
+        (payload: any) => {
+          // Only show notification if the video belongs to the current tab
+          if (payload.new?.tab_type === tabType) {
+            console.log('Real-time: New video added for tab', tabType, payload.new);
+            queryClient.invalidateQueries({ queryKey: ['user-videos', user.id, tabType] });
+            toast({
+              title: "New Video Added",
+              description: `A new video has been added to your ${tabType.toUpperCase()} tab.`,
+            });
+          }
         }
       )
       .on(
@@ -152,9 +215,11 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
           table: 'user_videos',
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
-          console.log('Real-time: Video updated', payload.new);
-          queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
+        (payload: any) => {
+          if (payload.new?.tab_type === tabType) {
+            // Use debounced refetch to prevent update loops
+            debouncedRefetch();
+          }
         }
       )
       .on(
@@ -165,9 +230,9 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
           table: 'user_videos',
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
+        (payload: any) => {
           console.log('Real-time: Video deleted', payload.old);
-          queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
+          queryClient.invalidateQueries({ queryKey: ['user-videos', user.id, tabType] });
         }
       )
       .subscribe((status) => {
@@ -176,7 +241,7 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
 
     // Also subscribe to tracked_videos for new channel uploads (global)
     const trackedVideosChannel = supabase
-      .channel('tracked-videos-realtime')
+      .channel(`tracked-videos-realtime-${tabType}`)
       .on(
         'postgres_changes',
         {
@@ -188,7 +253,7 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
           console.log('Real-time: New tracked video', payload.new);
           // Refetch user videos as the trigger should have synced it
           setTimeout(() => {
-            queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
+            queryClient.invalidateQueries({ queryKey: ['user-videos', user.id, tabType] });
           }, 1000); // Small delay to allow trigger to complete
         }
       )
@@ -198,7 +263,7 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
       supabase.removeChannel(userVideosChannel);
       supabase.removeChannel(trackedVideosChannel);
     };
-  }, [user?.id, queryClient, toast]);
+  }, [user?.id, tabType, queryClient, toast]);
 
   // One-time metadata refresh to fix channel_subscribers, niche, upload_date etc.
   useEffect(() => {
