@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Settings, Trash2, Youtube, Loader2, Sparkles, Save, RotateCcw, Pencil, X, Globe } from 'lucide-react';
+import { Settings, Trash2, Youtube, Loader2, Sparkles, Save, RotateCcw, Pencil, X, Globe, Lightbulb } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,7 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-export type TabType = 'usa' | 'spanish';
+export type TabType = 'usa' | 'spanish' | 'ideation';
 
 interface TrackedChannel {
   id: string;
@@ -54,7 +54,7 @@ const tools: Tool[] = [
 
 export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ trigger, showAllUsers = false, tabType = 'usa' }) => {
   const { toast } = useToast();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, adminDataMode } = useAuth();
   const queryClient = useQueryClient();
   const [channels, setChannels] = useState<TrackedChannel[]>([]);
   const [loading, setLoading] = useState(false);
@@ -76,12 +76,22 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
     
     setLoading(true);
     try {
-      // Fetch channels for this user
-      const { data, error } = await supabase
+      // Build query based on context:
+      // - Admin in "All Data" mode on Ideation: fetch ALL users' ideation channels
+      // - Admin in "My Data" mode or regular user: fetch only their channels
+      let query = supabase
         .from('tracked_channels')
-        .select('id, channel_id, channel_name, channel_thumbnail, is_global, user_id, tab_type')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .select('id, channel_id, channel_name, channel_thumbnail, is_global, user_id, tab_type');
+      
+      // Admin in "All Data" mode on Ideation tab - fetch all users' channels
+      const isAdminAllDataIdeation = isAdmin && adminDataMode === 'all-data' && tabType === 'ideation';
+      
+      if (!isAdminAllDataIdeation) {
+        // Regular user or admin in "My Data" mode - only their channels
+        query = query.eq('user_id', user.id);
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching channels:', error);
@@ -89,7 +99,18 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
       }
       
       // Filter by tabType if tab_type column exists
-      const filteredData = data?.filter(channel => !channel.tab_type || channel.tab_type === tabType) || [];
+      let filteredData = data?.filter(channel => !channel.tab_type || channel.tab_type === tabType) || [];
+      
+      // Additional filtering based on tab type:
+      // - Country tabs (USA, Spanish): show only global/admin-added channels
+      // - Ideation tab: show only user-added (non-global) channels
+      if (tabType === 'ideation') {
+        // Ideation: only show user's personal channels (not global)
+        filteredData = filteredData.filter(channel => !channel.is_global);
+      } else {
+        // Country tabs: only show global/admin-added channels
+        filteredData = filteredData.filter(channel => channel.is_global);
+      }
       
       // Deduplicate by channel_id, keeping the first entry (most recent due to ordering)
       const channelMap = new Map<string, TrackedChannel>();
@@ -120,7 +141,7 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
       setPrompts(getAIPrompts());
       setEditingTool(null);
     }
-  }, [open, user?.id, showAllUsers, tabType]);
+  }, [open, user?.id, showAllUsers, tabType, adminDataMode]);
 
   // Real-time subscription for tracked_channels updates (when admin adds channels for all users)
   useEffect(() => {
@@ -296,7 +317,15 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
     setEditingTool(null);
   };
 
-  const tabDisplayName = tabType === 'usa' ? 'USA' : 'Spanish';
+  const getTabDisplayName = (tab: TabType) => {
+    if (tab === 'usa') return 'USA';
+    if (tab === 'spanish') return 'Spanish';
+    if (tab === 'ideation') return 'Ideation';
+    return tab;
+  };
+  
+  const tabDisplayName = getTabDisplayName(tabType);
+  const isIdeationTab = tabType === 'ideation';
 
   return (
     <>
@@ -317,11 +346,15 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
           <SheetHeader>
             <SheetTitle className="text-white flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#cc0000] to-[#aa0000] flex items-center justify-center shadow-lg shadow-[#cc0000]/30">
-                <Settings className="w-5 h-5 text-white" />
+                {isIdeationTab ? <Lightbulb className="w-5 h-5 text-white" /> : <Settings className="w-5 h-5 text-white" />}
               </div>
               <div>
                 <span className="text-lg font-semibold">{tabDisplayName} Settings</span>
-                <p className="text-sm font-normal text-[#888888]">Manage channels & AI prompts for {tabDisplayName}</p>
+                <p className="text-sm font-normal text-[#888888]">
+                  {isIdeationTab 
+                    ? 'Manage your personal channels & AI prompts' 
+                    : `Manage channels & AI prompts for ${tabDisplayName}`}
+                </p>
               </div>
             </SheetTitle>
           </SheetHeader>
@@ -329,9 +362,21 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
           {/* Tracked Channels Section */}
           <div className="mt-6">
             <div className="flex items-center gap-2 mb-3">
-              <Youtube className="w-5 h-5 text-[#cc0000]" />
-              <h3 className="text-white font-medium">Tracked Channels ({tabDisplayName})</h3>
+              {isIdeationTab ? <Lightbulb className="w-5 h-5 text-[#cc0000]" /> : <Youtube className="w-5 h-5 text-[#cc0000]" />}
+              <h3 className="text-white font-medium">
+                {isIdeationTab ? 'Your Channels (Ideation)' : `Tracked Channels (${tabDisplayName})`}
+              </h3>
             </div>
+            
+            {/* Info banner for country tabs */}
+            {!isIdeationTab && (
+              <div className="mb-3 p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                <p className="text-xs text-blue-400 flex items-center gap-1">
+                  <Globe className="w-3 h-3" />
+                  These channels are managed by admin and sync for all users.
+                </p>
+              </div>
+            )}
             
             <div className="space-y-2">
               {loading ? (
@@ -340,10 +385,12 @@ export const TrackedChannelsDrawer: React.FC<TrackedChannelsDrawerProps> = ({ tr
                 </div>
               ) : channels.length === 0 ? (
                 <div className="text-center py-6 bg-[#0f0f0f] rounded-lg border border-[#272727]">
-                  <Youtube className="w-8 h-8 text-[#272727] mx-auto mb-2" />
+                  {isIdeationTab ? <Lightbulb className="w-8 h-8 text-[#272727] mx-auto mb-2" /> : <Youtube className="w-8 h-8 text-[#272727] mx-auto mb-2" />}
                   <p className="text-[#888888] text-sm">No tracked channels for {tabDisplayName} yet</p>
                   <p className="text-xs text-[#666666] mt-1">
-                    Add channels using the button above
+                    {isIdeationTab 
+                      ? 'Add channels using the button above to start tracking' 
+                      : 'Channels are added by admin for all users'}
                   </p>
                 </div>
               ) : (

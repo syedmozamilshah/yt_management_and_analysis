@@ -162,10 +162,10 @@ Deno.serve(async (req) => {
     let totalAnalyzedCount = 0;
 
     if (dataSource === 'favorites') {
-      // Query user's favorite videos from user_videos table
+      // Query user's favorite videos from user_videos table - from ALL tabs
       const { data: favoriteVideos, error: favoriteError } = await supabaseClient
         .from('user_videos')
-        .select('id, title, view_count, channel_subscribers, niche, youtube_url, thumbnail_url, channel_name, upload_date')
+        .select('id, title, view_count, channel_subscribers, niche, youtube_url, thumbnail_url, channel_name, upload_date, tab_type')
         .eq('user_id', user.id)
         .eq('is_favorite', true)
         .order('view_count', { ascending: false });
@@ -179,12 +179,12 @@ Deno.serve(async (req) => {
       }
 
       allRelevantVideos = favoriteVideos || [];
-      console.log(`Found ${allRelevantVideos.length} favorite videos from user's ideation`);
+      console.log(`Found ${allRelevantVideos.length} favorite videos from ALL tabs (ideation, usa, spanish)`);
 
       // If user has very few favorites, suggest using outliers instead
       if (allRelevantVideos.length < 5) {
         return new Response(JSON.stringify({ 
-          error: 'Not enough favorite videos in your Ideation. Please add at least 5 favorites or use the Outliers option.' 
+          error: 'Not enough favorite videos. Please add at least 5 favorites from any tab or use the Outliers option.' 
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -194,19 +194,19 @@ Deno.serve(async (req) => {
       // Set the total analyzed count
       totalAnalyzedCount = allRelevantVideos.length;
       
-      console.log(`Analyzed ${totalAnalyzedCount} favorite videos from user's ideation`);
+      console.log(`Analyzed ${totalAnalyzedCount} favorite videos from all tabs`);
     } else {
-      // OUTLIERS: Get videos from user's ideation where views > average channel views
+      // OUTLIERS: Get videos from ALL user's tabs where views > average channel views
       // First, get all user's videos grouped by channel to calculate averages
       const { data: userVideos, error: userVideosError } = await supabaseClient
         .from('user_videos')
-        .select('id, title, view_count, channel_subscribers, channel_name, niche, youtube_url, thumbnail_url, upload_date')
+        .select('id, title, view_count, channel_subscribers, channel_name, niche, youtube_url, thumbnail_url, upload_date, tab_type')
         .eq('user_id', user.id)
         .order('view_count', { ascending: false });
 
       if (userVideosError) {
         console.error('Error fetching user videos:', userVideosError);
-        return new Response(JSON.stringify({ error: 'Failed to fetch videos from your ideation' }), {
+        return new Response(JSON.stringify({ error: 'Failed to fetch videos' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -214,12 +214,14 @@ Deno.serve(async (req) => {
 
       if (!userVideos || userVideos.length === 0) {
         return new Response(JSON.stringify({ 
-          error: 'No videos found in your Ideation. Please add some videos first.' 
+          error: 'No videos found. Please add some videos to your Ideation, USA, or Spanish tabs first.' 
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+
+      console.log(`Found ${userVideos.length} total videos across all tabs`);
 
       // Calculate average views per channel
       const channelStats: { [channel: string]: { totalViews: number; count: number } } = {};
@@ -256,11 +258,11 @@ Deno.serve(async (req) => {
         return isOutlier;
       });
 
-      console.log(`Found ${outlierVideos.length} outlier videos from ${userVideos.length} total videos`);
+      console.log(`Found ${outlierVideos.length} outlier videos from ${userVideos.length} total videos across all tabs`);
 
       if (outlierVideos.length < 3) {
         return new Response(JSON.stringify({ 
-          error: 'Not enough outlier videos found. Add more videos to your Ideation or try the Favorites option.' 
+          error: 'Not enough outlier videos found. Add more videos to your tabs or try the Favorites option.' 
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

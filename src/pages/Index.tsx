@@ -7,7 +7,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/s
 import { AppSidebar } from '@/components/AppSidebar';
 import { TrackedChannelsDrawer } from '@/components/TrackedChannelsDrawer';
 import { ChannelAnalysisDialog } from '@/components/ChannelAnalysisDialog';
-import { Globe, User, Plus, Search, Loader2, Users } from 'lucide-react';
+import { Globe, User, Plus, Search, Loader2, Users, Lightbulb } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -38,11 +38,11 @@ interface ChannelData {
   rss_feed_url?: string;
 }
 
-export type TabType = 'usa' | 'spanish';
+export type TabType = 'usa' | 'spanish' | 'ideation';
 
 const Index = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [activeTab, setActiveTab] = useState<'usa' | 'spanish' | 'title-generator'>('usa');
+  const [activeTab, setActiveTab] = useState<'usa' | 'spanish' | 'ideation' | 'title-generator'>('ideation');
   const navigate = useNavigate();
   const location = useLocation();
   const { isAdmin, shouldQueryAllData, adminDataMode, user } = useAuth();
@@ -58,7 +58,10 @@ const Index = () => {
 
   // Get the display name for the current tab
   const getTabDisplayName = (tab: TabType) => {
-    return tab === 'usa' ? 'USA' : 'Spanish';
+    if (tab === 'usa') return 'USA';
+    if (tab === 'spanish') return 'Spanish';
+    if (tab === 'ideation') return 'Ideation';
+    return tab;
   };
 
   // Track user activity when opening page
@@ -95,9 +98,12 @@ const Index = () => {
       setActiveTab('spanish');
     } else if (tab === 'usa') {
       setActiveTab('usa');
+    } else if (tab === 'ideation') {
+      // Admin can view Ideation in both modes (All Data shows all users, My Data shows own)
+      setActiveTab('ideation');
     } else {
-      // Default to USA tab
-      setActiveTab('usa');
+      // Default to Ideation
+      setActiveTab('ideation');
     }
   }, [location.search]);
 
@@ -150,7 +156,19 @@ const Index = () => {
     handleVideoAdded();
   };
 
-  const isVideoTab = activeTab === 'usa' || activeTab === 'spanish';
+  const isVideoTab = activeTab === 'usa' || activeTab === 'spanish' || activeTab === 'ideation';
+  const isCountryTab = activeTab === 'usa' || activeTab === 'spanish';
+  
+  // Users can only add channels in Ideation tab
+  // Admin in "All Data" mode can add to country tabs (USA, Spanish) - these will be global for all users
+  // Admin in "All Data" mode on Ideation tab: NO add button (viewing all users' data)
+  // Admin in "My Data" mode can add to Ideation for personal videos
+  const canAddChannel = (isAdmin && isCountryTab && adminDataMode === 'all-data') || 
+                        (isAdmin && adminDataMode === 'my-data' && (activeTab === 'ideation' || isCountryTab)) || 
+                        (!isAdmin && activeTab === 'ideation');
+  
+  // Determine if this is a global add (for all users) or personal add
+  const isGlobalAdd = isAdmin && isCountryTab;
 
   return (
     <SidebarProvider>
@@ -171,14 +189,17 @@ const Index = () => {
               </div>
             )}
 
-            {/* Header for USA/Spanish tabs */}
+            {/* Header for Video tabs (Ideation, USA, Spanish) */}
             {isVideoTab && (
               <div className="sticky top-0 z-10 backdrop-blur-xl bg-[#181818] border-b border-[#272727]">
                 <div className="px-4 sm:px-8 py-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <SidebarTrigger className="text-[#f1f1f1] hover:bg-[#272727] rounded-xl p-2 transition-all duration-300" />
-                      <h1 className="text-xl font-semibold text-white">{getTabDisplayName(activeTab as TabType)}</h1>
+                      <div className="flex items-center gap-2">
+                        {activeTab === 'ideation' && <Lightbulb className="w-5 h-5 text-[#cc0000]" />}
+                        <h1 className="text-xl font-semibold text-white">{getTabDisplayName(activeTab as TabType)}</h1>
+                      </div>
                       {isAdmin && (
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#212121] border border-[#272727]">
                           {shouldQueryAllData() ? (
@@ -205,68 +226,83 @@ const Index = () => {
             <div className="px-4 sm:px-8 py-8">
               {isVideoTab && (
                 <>
-                  {/* Add Channel Button - Full width, above filters */}
-                  <div className="mb-6">
-                    <Dialog open={addChannelModalOpen} onOpenChange={setAddChannelModalOpen}>
-                      <DialogTrigger asChild>
-                        <Button
-                          className="w-full h-12 bg-[#cc0000] hover:bg-[#aa0000] text-white flex items-center justify-center gap-2 text-lg font-semibold rounded-xl"
-                        >
-                          <Plus className="w-5 h-5" />
-                          Add Channel for {getTabDisplayName(activeTab as TabType)}
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="bg-[#181818] border border-[#272727] text-white sm:max-w-md">
-                        <DialogHeader>
-                          <DialogTitle className="text-white flex items-center gap-2">
-                            <Users className="w-5 h-5 text-[#cc0000]" />
-                            Add Channel for {getTabDisplayName(activeTab as TabType)}
-                          </DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4 mt-4">
-                          <div className="space-y-2">
-                            <Label className="text-[#aaaaaa]">Channel URL or Handle</Label>
-                            <Input
-                              value={channelUrl}
-                              onChange={(e) => setChannelUrl(e.target.value)}
-                              placeholder="@channelname or youtube.com/..."
-                              className="bg-[#0f0f0f] border-[#272727] text-white placeholder:text-[#666666]"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-[#aaaaaa]">Time Period</Label>
-                            <Select value={daysPeriod} onValueChange={setDaysPeriod}>
-                              <SelectTrigger className="bg-[#0f0f0f] border-[#cc0000] text-white">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="bg-[#181818] border-[#272727]">
-                                <SelectItem value="7">Last 7 days</SelectItem>
-                                <SelectItem value="28">Last 28 days</SelectItem>
-                                <SelectItem value="90">Last 90 days</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                  {/* Add Channel Button - Only show for users on Ideation tab, or for admins on any tab */}
+                  {canAddChannel && (
+                    <div className="mb-6">
+                      <Dialog open={addChannelModalOpen} onOpenChange={setAddChannelModalOpen}>
+                        <DialogTrigger asChild>
                           <Button
-                            onClick={handleAnalyzeChannel}
-                            disabled={!channelUrl.trim() || isAddingChannel}
-                            className="w-full bg-[#cc0000] hover:bg-[#aa0000] text-white"
+                            className="w-full h-12 bg-[#cc0000] hover:bg-[#aa0000] text-white flex items-center justify-center gap-2 text-lg font-semibold rounded-xl"
                           >
-                            {isAddingChannel ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Adding Channel...
-                              </>
-                            ) : (
-                              <>
-                                <Search className="w-4 h-4 mr-2" />
-                                Analyze Channel
-                              </>
-                            )}
+                            <Plus className="w-5 h-5" />
+                            {isAdmin && isCountryTab 
+                              ? `Add Channel for All Users (${getTabDisplayName(activeTab as TabType)})` 
+                              : `Add Channel for ${getTabDisplayName(activeTab as TabType)}`}
                           </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
+                        </DialogTrigger>
+                        <DialogContent className="bg-[#181818] border border-[#272727] text-white sm:max-w-md">
+                          <DialogHeader>
+                            <DialogTitle className="text-white flex items-center gap-2">
+                              {activeTab === 'ideation' ? (
+                                <Lightbulb className="w-5 h-5 text-[#cc0000]" />
+                              ) : (
+                                <Users className="w-5 h-5 text-[#cc0000]" />
+                              )}
+                              {isAdmin && isCountryTab 
+                                ? `Add Channel for All Users (${getTabDisplayName(activeTab as TabType)})` 
+                                : `Add Channel for ${getTabDisplayName(activeTab as TabType)}`}
+                            </DialogTitle>
+                            {isAdmin && isCountryTab && (
+                              <p className="text-sm text-[#888888] mt-1">
+                                This channel will be added to ALL users in the {getTabDisplayName(activeTab as TabType)} tab.
+                              </p>
+                            )}
+                          </DialogHeader>
+                          <div className="space-y-4 mt-4">
+                            <div className="space-y-2">
+                              <Label className="text-[#aaaaaa]">Channel URL or Handle</Label>
+                              <Input
+                                value={channelUrl}
+                                onChange={(e) => setChannelUrl(e.target.value)}
+                                placeholder="@channelname or youtube.com/..."
+                                className="bg-[#0f0f0f] border-[#272727] text-white placeholder:text-[#666666]"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-[#aaaaaa]">Time Period</Label>
+                              <Select value={daysPeriod} onValueChange={setDaysPeriod}>
+                                <SelectTrigger className="bg-[#0f0f0f] border-[#cc0000] text-white">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-[#181818] border-[#272727]">
+                                  <SelectItem value="7">Last 7 days</SelectItem>
+                                  <SelectItem value="28">Last 28 days</SelectItem>
+                                  <SelectItem value="90">Last 90 days</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <Button
+                              onClick={handleAnalyzeChannel}
+                              disabled={!channelUrl.trim() || isAddingChannel}
+                              className="w-full bg-[#cc0000] hover:bg-[#aa0000] text-white"
+                            >
+                              {isAddingChannel ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Adding Channel...
+                                </>
+                              ) : (
+                                <>
+                                  <Search className="w-4 h-4 mr-2" />
+                                  Analyze Channel
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  )}
 
                   {/* Video Grid */}
                   {shouldQueryAllData() ? (

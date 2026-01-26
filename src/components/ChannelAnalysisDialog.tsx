@@ -21,7 +21,7 @@ import {
 import { formatNumber } from '@/utils/formatNumbers';
 import { NicheCombobox } from '@/components/NicheCombobox';
 
-export type TabType = 'usa' | 'spanish';
+export type TabType = 'usa' | 'spanish' | 'ideation';
 
 interface ChannelData {
   channel_id: string;
@@ -298,7 +298,7 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
 
         toast({
           title: "✅ Added for All Users!",
-          description: `Successfully added ${videos.length} videos to ALL ${allUsers?.length || 0} users in ${tabTypeToUse.toUpperCase()} tab. Future videos will be auto-added.`
+          description: `Successfully added ${videos.length} videos to ALL ${allUsers?.length || 0} users in the ${tabTypeToUse === 'usa' ? 'USA' : 'Spanish'} tab. Future videos will be auto-added.`
         });
       } else {
         // Regular user or admin personal mode - add to user_videos with tab_type
@@ -370,9 +370,15 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
         queryClient.invalidateQueries({ queryKey: ['user-videos', user.id, tabTypeToUse] });
         queryClient.invalidateQueries({ queryKey: ['tracked-channels'] });
 
+        const tabDisplayNames: Record<TabType, string> = {
+          'usa': 'USA',
+          'spanish': 'Spanish',
+          'ideation': 'Ideation'
+        };
+
         toast({
           title: "✅ Videos Added!",
-          description: `Successfully added ${videos.length} video${videos.length > 1 ? 's' : ''} to your ${tabTypeToUse.toUpperCase()} tab. Future videos from this channel will be auto-added.`
+          description: `Successfully added ${videos.length} video${videos.length > 1 ? 's' : ''} to your ${tabDisplayNames[tabTypeToUse]} tab. Future videos from this channel will be auto-added.`
         });
       }
 
@@ -498,24 +504,28 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
             />
           </div>
 
-          {/* Tab Selection for Admin */}
-          {isAdmin && (
+          {/* Tab/Country Selection for Admin on country tabs */}
+          {isAdmin && initialTabType !== 'ideation' && (
             <div className="space-y-2">
-              <Label className="text-[#aaaaaa]">Add to Tab</Label>
+              <Label className="text-[#aaaaaa]">Select Country/Region</Label>
               <Select value={selectedTabType} onValueChange={(value: TabType) => setSelectedTabType(value)}>
                 <SelectTrigger className="bg-[#0f0f0f] border-[#cc0000] text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-[#181818] border-[#272727]">
-                  <SelectItem value="usa">USA</SelectItem>
-                  <SelectItem value="spanish">Spanish</SelectItem>
+                  <SelectItem value="usa">🇺🇸 USA</SelectItem>
+                  <SelectItem value="spanish">🇪🇸 Spanish</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-[#888888]">
+                Videos will be added to ALL users in this country tab.
+              </p>
             </div>
           )}
 
           {/* Add Videos Buttons */}
-          {isAdmin ? (
+          {isAdmin && initialTabType !== 'ideation' ? (
+            // Admin on country tabs - only global add button (for all users)
             <div className="space-y-3">
               <Button
                 onClick={() => handleAddVideos('global')}
@@ -525,35 +535,18 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
                 {isAddingVideos && addingMode === 'global' ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Adding for All Users to {selectedTabType.toUpperCase()}...
+                    Adding for All Users to {selectedTabType === 'usa' ? '🇺🇸 USA' : '🇪🇸 Spanish'}...
                   </>
                 ) : (
                   <>
                     <Globe className="w-4 h-4 mr-2" />
-                    Add for All Users to {selectedTabType.toUpperCase()} ({videoCount} Videos)
-                  </>
-                )}
-              </Button>
-              <Button
-                onClick={() => handleAddVideos('personal')}
-                disabled={!niche.trim() || isAddingVideos || videoCount === 0 || isLoadingVideos}
-                variant="outline"
-                className="w-full h-12 border-[#404040] text-[#f1f1f1] hover:bg-[#272727] font-semibold rounded-xl disabled:opacity-50"
-              >
-                {isAddingVideos && addingMode === 'personal' ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Adding to Your {selectedTabType.toUpperCase()} Tab...
-                  </>
-                ) : (
-                  <>
-                    <User className="w-4 h-4 mr-2" />
-                    Add to Your {selectedTabType.toUpperCase()} Tab Only
+                    Add for All Users to {selectedTabType === 'usa' ? '🇺🇸 USA' : '🇪🇸 Spanish'} ({videoCount} Videos)
                   </>
                 )}
               </Button>
             </div>
           ) : (
+            // User on ideation tab OR admin on ideation tab - personal add only
             <Button
               onClick={() => handleAddVideos('personal')}
               disabled={!niche.trim() || isAddingVideos || videoCount === 0 || isLoadingVideos}
@@ -562,21 +555,21 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
               {isAddingVideos ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Adding Videos...
+                  Adding Videos to Ideation...
                 </>
               ) : (
                 <>
                   <Plus className="w-4 h-4 mr-2" />
-                  Add {videoCount} Video{videoCount !== 1 ? 's' : ''}
+                  Add {videoCount} Video{videoCount !== 1 ? 's' : ''} to Ideation
                 </>
               )}
             </Button>
           )}
 
           <p className="text-xs text-[#666666] text-center">
-            {isAdmin 
-              ? `Videos will be added to the ${selectedTabType.toUpperCase()} tab. Add for all users to make videos visible globally, or add to your personal tab.`
-              : `Videos will be added to your ${initialTabType.toUpperCase()} tab with the selected niche`
+            {isAdmin && initialTabType !== 'ideation'
+              ? `Videos will be added to ALL users in the ${selectedTabType === 'usa' ? 'USA' : 'Spanish'} tab and future videos will auto-sync.`
+              : `Videos will be added to your Ideation tab with the selected niche.`
             }
           </p>
         </div>

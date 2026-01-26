@@ -4,7 +4,7 @@ import { FilterBar } from './FilterBar';
 import { useToast } from '@/hooks/use-toast';
 import { Video } from '@/types/video';
 import { FilterState, defaultFilters, applyFilters, getUniqueNiches, getViewCountBounds, getSubscriberCountBounds } from '@/utils/filterUtils';
-import { Grid3X3, Sparkles, Users, Trash2, X } from 'lucide-react';
+import { Grid3X3, Sparkles, Users, Trash2, X, CheckSquare, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -18,8 +18,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-export type TabType = 'usa' | 'spanish';
+export type TabType = 'usa' | 'spanish' | 'ideation';
 
 interface AllUsersVideoGridProps {
   refreshTrigger?: number;
@@ -32,6 +38,7 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isMoving, setIsMoving] = useState(false);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const wasLongPressRef = useRef(false);
   const { toast } = useToast();
@@ -329,6 +336,54 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
     }
   };
 
+  // Select all visible videos
+  const handleSelectAll = useCallback(() => {
+    setIsSelectionMode(true);
+    setSelectedVideos(new Set(filteredVideos.map(v => v.id)));
+  }, [filteredVideos]);
+
+  // Move selected videos to another tab
+  const handleMoveToTab = async (targetTab: TabType) => {
+    if (selectedVideos.size === 0 || targetTab === tabType) return;
+    
+    setIsMoving(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('user_videos')
+        .update({ tab_type: targetTab })
+        .in('id', Array.from(selectedVideos));
+
+      if (error) throw error;
+
+      const tabNames: Record<TabType, string> = {
+        'usa': '🇺🇸 USA',
+        'spanish': '🇪🇸 Spanish',
+        'ideation': '💡 Ideation'
+      };
+
+      toast({
+        title: "Videos Moved",
+        description: `Moved ${selectedVideos.size} video${selectedVideos.size > 1 ? 's' : ''} to ${tabNames[targetTab]}`
+      });
+
+      setSelectedVideos(new Set());
+      setIsSelectionMode(false);
+      // Refresh both the current tab and the target tab
+      queryClient.invalidateQueries({ queryKey: ['all-users-videos', tabType] });
+      queryClient.invalidateQueries({ queryKey: ['all-users-videos', targetTab] });
+      queryClient.invalidateQueries({ queryKey: ['user-videos'] });
+    } catch (error) {
+      console.error('Error moving videos:', error);
+      toast({
+        title: "Error",
+        description: "Failed to move videos",
+        variant: "destructive"
+      });
+    } finally {
+      setIsMoving(false);
+    }
+  };
+
   // Only show loading skeleton on initial load (when we have no cached data)
   const showLoadingSkeleton = isLoading && videos.length === 0;
 
@@ -360,15 +415,35 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
   }
 
   if (videos.length === 0) {
+    const isIdeationTab = tabType === 'ideation';
+    const tabDisplayName = tabType === 'usa' ? 'USA' : tabType === 'spanish' ? 'Spanish' : 'Ideation';
+    
     return (
       <div className="bg-[#181818] rounded-2xl border border-[#272727] p-12 text-center">
         <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[#272727] mb-6">
           <Users className="w-10 h-10 text-[#aaaaaa]" />
         </div>
-        <h3 className="text-2xl font-bold text-[#f1f1f1] mb-3">No User Videos Yet</h3>
-        <p className="text-[#aaaaaa] text-lg mb-6 max-w-md mx-auto">
-          No videos have been added by any users yet. Videos added by users will appear here.
-        </p>
+        {isIdeationTab ? (
+          <>
+            <h3 className="text-2xl font-bold text-[#f1f1f1] mb-3">No Ideation Videos Yet</h3>
+            <p className="text-[#aaaaaa] text-lg mb-4 max-w-md mx-auto">
+              Users haven't added any videos to their Ideation tab yet.
+            </p>
+            <p className="text-[#888888] text-base max-w-md mx-auto">
+              Videos added by users to their personal Ideation tab will appear here.
+            </p>
+          </>
+        ) : (
+          <>
+            <h3 className="text-2xl font-bold text-[#f1f1f1] mb-3">No Videos in {tabDisplayName} Tab</h3>
+            <p className="text-[#aaaaaa] text-lg mb-4 max-w-md mx-auto">
+              Click the <span className="text-[#cc0000] font-semibold">"Add Channel"</span> button above to add videos for all users.
+            </p>
+            <p className="text-[#888888] text-base max-w-md mx-auto">
+              Videos you add here will be visible to all users in the {tabDisplayName} tab.
+            </p>
+          </>
+        )}
       </div>
     );
   }
@@ -391,14 +466,63 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
               {selectedVideos.size} selected
             </span>
           </div>
-          <Button
-            onClick={() => setShowDeleteDialog(true)}
-            disabled={selectedVideos.size === 0}
-            className="bg-white text-[#cc0000] hover:bg-gray-100"
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Select All Button */}
+            <Button
+              onClick={handleSelectAll}
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-white/20"
+            >
+              <CheckSquare className="w-4 h-4 mr-2" />
+              Select All ({filteredVideos.length})
+            </Button>
+            
+            {/* Move to Tab Dropdown - Admin can only move TO country tabs, not TO ideation */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  disabled={selectedVideos.size === 0 || isMoving}
+                  variant="ghost"
+                  size="sm"
+                  className="text-white hover:bg-white/20"
+                >
+                  <ArrowRight className="w-4 h-4 mr-2" />
+                  {isMoving ? 'Moving...' : 'Move to Country Tab'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-[#181818] border-[#272727]">
+                {tabType !== 'usa' && (
+                  <DropdownMenuItem 
+                    onClick={() => handleMoveToTab('usa')}
+                    className="text-white hover:bg-[#272727] cursor-pointer"
+                  >
+                    <span className="mr-2">🇺🇸</span>
+                    USA
+                  </DropdownMenuItem>
+                )}
+                {tabType !== 'spanish' && (
+                  <DropdownMenuItem 
+                    onClick={() => handleMoveToTab('spanish')}
+                    className="text-white hover:bg-[#272727] cursor-pointer"
+                  >
+                    <span className="mr-2">🇪🇸</span>
+                    Spanish
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {/* Delete Button */}
+            <Button
+              onClick={() => setShowDeleteDialog(true)}
+              disabled={selectedVideos.size === 0}
+              className="bg-white text-[#cc0000] hover:bg-gray-100"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </Button>
+          </div>
         </div>
       )}
 

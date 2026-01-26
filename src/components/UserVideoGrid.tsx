@@ -22,7 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-export type TabType = 'usa' | 'spanish';
+export type TabType = 'usa' | 'spanish' | 'ideation';
 
 interface UserVideoGridProps {
   refreshTrigger?: number;
@@ -544,19 +544,35 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
   }
 
   if (videos.length === 0) {
+    const isIdeationTab = tabType === 'ideation';
+    
     return (
       <div className="space-y-6">
         <div className="bg-[#181818] rounded-2xl border border-[#272727] p-12 text-center">
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[#272727] mb-6">
             <Sparkles className="w-10 h-10 text-[#aaaaaa]" />
           </div>
-          <h3 className="text-2xl font-bold text-[#f1f1f1] mb-3">Start Tracking Your Competitors</h3>
-          <p className="text-[#aaaaaa] text-lg mb-4 max-w-md mx-auto">
-            Add your competitor channels to start seeing how they're doing.
-          </p>
-          <p className="text-[#888888] text-base max-w-md mx-auto">
-            Click the <span className="text-[#cc0000] font-semibold">"Add Channel"</span> button in the sidebar to get started.
-          </p>
+          {isIdeationTab ? (
+            <>
+              <h3 className="text-2xl font-bold text-[#f1f1f1] mb-3">Start Tracking Your Competitors</h3>
+              <p className="text-[#aaaaaa] text-lg mb-4 max-w-md mx-auto">
+                Add your competitor channels to start seeing how they're doing.
+              </p>
+              <p className="text-[#888888] text-base max-w-md mx-auto">
+                Click the <span className="text-[#cc0000] font-semibold">"Add Channel"</span> button above to get started.
+              </p>
+            </>
+          ) : (
+            <>
+              <h3 className="text-2xl font-bold text-[#f1f1f1] mb-3">No Videos Yet</h3>
+              <p className="text-[#aaaaaa] text-lg mb-4 max-w-md mx-auto">
+                Videos will appear here once they are added by the admin.
+              </p>
+              <p className="text-[#888888] text-base max-w-md mx-auto">
+                Check back later for new content in the {tabType === 'usa' ? 'USA' : 'Spanish'} tab.
+              </p>
+            </>
+          )}
         </div>
       </div>
     );

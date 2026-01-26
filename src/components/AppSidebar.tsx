@@ -45,8 +45,15 @@ export function AppSidebar() {
   const navigate = useNavigate()
   const { user, isAdmin, signOut, adminDataMode, setAdminDataMode } = useAuth()
 
-  // Menu items - Reorganized sidebar with USA and Spanish tabs
+  // Menu items - Reorganized sidebar with Ideation, USA and Spanish tabs
+  // Ideation is shown for everyone - admin in All Data mode sees all users' data, in My Data mode sees own data
   const mainItems = [
+    {
+      title: "Ideation",
+      url: "/?tab=ideation",
+      icon: Lightbulb,
+      emoji: null,
+    },
     {
       title: "USA",
       url: "/?tab=usa",
@@ -106,8 +113,8 @@ export function AppSidebar() {
       
       if (currentPath === itemPath) {
         for (const [key, value] of params.entries()) {
-          // Special case: USA tab should be active when on / with no tab param
-          if (key === 'tab' && value === 'usa' && !currentParams.get('tab')) {
+          // Special case: Ideation tab should be active when on / with no tab param (default)
+          if (key === 'tab' && value === 'ideation' && !currentParams.get('tab')) {
             return true;
           }
           if (currentParams.get(key) === value) {

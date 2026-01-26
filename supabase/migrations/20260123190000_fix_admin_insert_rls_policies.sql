@@ -32,6 +32,10 @@ DROP POLICY IF EXISTS "Users can view their own subscriptions" ON public.user_ch
 DROP POLICY IF EXISTS "Users can insert their own subscriptions" ON public.user_channel_subscriptions;
 DROP POLICY IF EXISTS "Users can update their own subscriptions" ON public.user_channel_subscriptions;
 DROP POLICY IF EXISTS "Users can delete their own subscriptions" ON public.user_channel_subscriptions;
+DROP POLICY IF EXISTS "user_channel_subscriptions_select" ON public.user_channel_subscriptions;
+DROP POLICY IF EXISTS "user_channel_subscriptions_insert" ON public.user_channel_subscriptions;
+DROP POLICY IF EXISTS "user_channel_subscriptions_update" ON public.user_channel_subscriptions;
+DROP POLICY IF EXISTS "user_channel_subscriptions_delete" ON public.user_channel_subscriptions;
 
 CREATE POLICY "user_channel_subscriptions_select" 
   ON public.user_channel_subscriptions 
