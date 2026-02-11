@@ -264,7 +264,7 @@ const Index = () => {
                               <Input
                                 value={channelUrl}
                                 onChange={(e) => setChannelUrl(e.target.value)}
-                                placeholder="@channelname or youtube.com/..."
+                                placeholder="https://www.youtube.com/@ChannelName"
                                 className="bg-[#0f0f0f] border-[#272727] text-white placeholder:text-[#666666]"
                               />
                             </div>

@@ -61,11 +61,18 @@ export async function analyzeChannel(channelUrl: string, daysPeriod: number = 7)
   });
 
   if (error) {
-    throw new Error(error.message || 'Failed to analyze channel');
+    // Try to extract more specific error message
+    const errorMessage = error.message || 'Failed to analyze channel';
+    console.error('Channel analysis error:', error);
+    throw new Error(errorMessage);
   }
 
-  if (data.error) {
+  if (data?.error) {
     throw new Error(data.error);
+  }
+
+  if (!data) {
+    throw new Error('No data returned from channel analysis');
   }
 
   return data;

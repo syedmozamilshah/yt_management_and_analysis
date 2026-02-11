@@ -30,14 +30,18 @@ class YouTubeApiKeyManager {
       'YOUTUBE_API_KEY_4'
     ];
 
+    console.log('\n╔═══════════════════════════════════════════════════════════╗');
+    console.log('║        YOUTUBE API KEY INITIALIZATION                     ║');
+    console.log('╚═══════════════════════════════════════════════════════════╝');
+
     this.keys = keyNames
       .map(name => {
         const key = Deno.env.get(name);
         if (key && key.trim() !== '') {
-          console.log(`Found API key: ${name}`);
+          console.log(`✅ Found API key: ${name} (${key.substring(0, 10)}...)`);
           return key;
         } else {
-          console.log(`API key not found or empty: ${name}`);
+          console.log(`❌ API key not found or empty: ${name}`);
           return null;
         }
       })
@@ -48,7 +52,19 @@ class YouTubeApiKeyManager {
         lastUsed: new Date(0)
       }));
 
-    console.log(`Initialized ${this.keys.length} YouTube API keys from: ${keyNames.join(', ')}`);
+    if (this.keys.length === 0) {
+      console.error('\n⚠️  ========================================================');
+      console.error('⚠️  NO YOUTUBE API KEYS CONFIGURED!');
+      console.error('⚠️  ========================================================');
+      console.error('⚠️  This means channel data might be inaccurate.');
+      console.error('⚠️  To fix: Add YouTube API keys to Supabase secrets:');
+      console.error('⚠️    1. Go to Supabase Dashboard');
+      console.error('⚠️    2. Project Settings → Edge Functions');
+      console.error('⚠️    3. Add secret: YOUTUBE_API_KEY');
+      console.error('⚠️  ========================================================\n');
+    } else {
+      console.log(`\n✅ Initialized ${this.keys.length} YouTube API key(s)\n`);
+    }
   }
 
   private resetDailyQuotas() {

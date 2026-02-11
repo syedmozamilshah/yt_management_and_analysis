@@ -303,6 +303,8 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
       } else {
         // Regular user or admin personal mode - add to user_videos with tab_type
         const tabTypeToUse = getTabType();
+        console.log('ChannelAnalysisDialog: Adding videos for user', user.id, 'tab_type:', tabTypeToUse, 'niche:', niche.trim());
+        
         const videosToInsert = videos.map(video => ({
           user_id: user.id,
           title: video.title,
@@ -318,11 +320,18 @@ export const ChannelAnalysisDialog: React.FC<ChannelAnalysisDialogProps> = ({
           tab_type: tabTypeToUse
         }));
 
+        console.log('ChannelAnalysisDialog: Inserting', videosToInsert.length, 'videos with sample:', videosToInsert[0] || 'none');
+
         const { error } = await (supabase as any)
           .from('user_videos')
           .insert(videosToInsert);
 
-        if (error) throw error;
+        if (error) {
+          console.error('ChannelAnalysisDialog: Error inserting videos:', error);
+          throw error;
+        } else {
+          console.log('ChannelAnalysisDialog: Videos inserted successfully');
+        }
 
         // Add tracked channel for this user
         await (supabase as any)

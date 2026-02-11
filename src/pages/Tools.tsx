@@ -714,7 +714,6 @@ const Tools = () => {
             </SidebarContent>
 
             <SidebarFooter className="border-t border-[#272727] p-4">
-              <img src="/blow_me_ai.png" alt="Blow Me AI" className="h-6 w-auto opacity-60" />
             </SidebarFooter>
           </Sidebar>
 

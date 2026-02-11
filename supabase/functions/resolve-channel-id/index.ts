@@ -131,7 +131,16 @@ serve(async (req: Request) => {
     const quotaFreeResult = await resolveChannelIdWithoutApi(channelUrl)
     
     if (quotaFreeResult) {
-      console.log('Successfully resolved channel via quota-free method:', quotaFreeResult.channel_name)
+      console.log('\n═══════════════════════════════════════════════════════════════')
+      console.log('Successfully resolved channel!')
+      console.log('═══════════════════════════════════════════════════════════════')
+      console.log('Resolution Method:', quotaFreeResult.resolution_method?.toUpperCase())
+      console.log('Channel Name:', quotaFreeResult.channel_name)
+      console.log('Channel Handle:', quotaFreeResult.channel_handle || 'None')
+      console.log('Channel ID:', quotaFreeResult.channel_id)
+      console.log('Subscribers:', quotaFreeResult.channel_subscribers?.toLocaleString() || 'Hidden/Unknown')
+      console.log('Thumbnail:', quotaFreeResult.channel_thumbnail ? 'YES' : 'NO')
+      console.log('═══════════════════════════════════════════════════════════════\n')
       
       // Save to cache
       const { error: upsertError } = await supabase
@@ -152,7 +161,7 @@ serve(async (req: Request) => {
       if (upsertError) {
         console.error('Error saving channel to cache:', upsertError)
       } else {
-        console.log('Channel saved to tracked_channels (quota-free)')
+        console.log('Channel saved to tracked_channels')
       }
 
       const response: ResolveChannelResponse = {

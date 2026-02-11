@@ -15,7 +15,7 @@ interface ScriptGeneratorProps {
 }
 
 const ANALYZE_WEBHOOK_URL = "https://n8n-14pv.onrender.com/webhook/6cd46bb2-4ab9-44a1-a055-68be14b77b08";
-const GENERATE_WEBHOOK_URL = "https://n8n-14pv.onrender.com/webhook/31cc881b-c4ab-4335-b7a8-5f9fb2cd73ce";
+const GENERATE_WEBHOOK_URL = "https://n8n-14pv.onrender.com/webhook/8d14f42d-67d6-4272-8edd-bdac7a5c4b45";
 
 const analyzeLoadingStages = [
   "Sending to Perplexity…",
