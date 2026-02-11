@@ -21,25 +21,26 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Get all channels from database
+    // Get tracked channels for auto-discovery (same source as RSS polling)
     const { data: channels, error: channelsError } = await supabase
-      .from('channels')
+      .from('tracked_channels')
       .select('channel_name, channel_id, channel_subscribers')
       .not('channel_id', 'is', null)
+      .eq('is_active', true)
 
     if (channelsError) {
-      throw new Error(`Failed to fetch channels: ${channelsError.message}`)
+      throw new Error(`Failed to fetch tracked channels: ${channelsError.message}`)
     }
 
     if (!channels || channels.length === 0) {
-      console.log('No channels found in database')
+      console.log('No tracked channels found in database')
       return new Response(
-        JSON.stringify({ success: true, message: 'No channels to process' }),
+        JSON.stringify({ success: true, message: 'No tracked channels to process', processedChannels: 0, totalNewVideos: 0, totalApiCalls: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log(`Found ${channels.length} channels to check for new videos`)
+    console.log(`Found ${channels.length} tracked channels to check for new videos`)
 
     let totalApiCalls = 0
     let totalNewVideos = 0
@@ -70,7 +71,7 @@ serve(async (req) => {
           continue
         }
 
-        const searchData = await searchResponse.json()
+        const searchData = await searchResponse.json() as { items?: Array<{ id: { videoId: string } }> }
         
         if (!searchData.items || searchData.items.length === 0) {
           console.log(`No recent videos found for channel: ${channel.channel_name}`)
@@ -83,9 +84,9 @@ serve(async (req) => {
         for (const video of searchData.items) {
           const videoId = video.id.videoId
           
-          // Check if video already exists in database
+          // Check if video already exists in tracked_videos (not in videos table)
           const { data: existingVideo, error: checkError } = await supabase
-            .from('videos')
+            .from('tracked_videos')
             .select('id')
             .eq('video_id', videoId)
             .single()
@@ -110,7 +111,7 @@ serve(async (req) => {
             continue
           }
 
-          const videoData = await videoResponse.json()
+          const videoData = await videoResponse.json() as { items?: Array<{ statistics?: { viewCount?: string }, snippet: { title: string, thumbnails: Record<string, { url: string }>, publishedAt: string } }> }
           
           if (!videoData.items || videoData.items.length === 0) {
             console.log(`Video details not found for ${videoId}`)
@@ -132,18 +133,19 @@ serve(async (req) => {
           if (shouldAddVideo) {
             console.log(`Adding new video: ${title} (${viewCount} views > ${channel.channel_subscribers} subscribers)`)
 
-            // Add video to database
+            // Add video to tracked_videos table (same as RSS polling, triggers sync to user_videos)
             const { error: insertError } = await supabase
-              .from('videos')
+              .from('tracked_videos')
               .insert({
-                title: title,
-                youtube_url: `https://www.youtube.com/watch?v=${videoId}`,
                 video_id: videoId,
+                channel_id: channel.channel_id,
+                title: title,
                 thumbnail_url: thumbnailUrl,
-                channel_name: channel.channel_name,
-                channel_subscribers: channel.channel_subscribers,
-                upload_date: uploadDate,
-                view_count: viewCount
+                youtube_url: `https://www.youtube.com/watch?v=${videoId}`,
+                published_at: uploadDate,
+                view_count: viewCount,
+                source: 'auto_discovery',
+                channel_name: channel.channel_name
               })
 
             if (insertError) {

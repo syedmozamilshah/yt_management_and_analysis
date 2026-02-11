@@ -70,8 +70,8 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
             .from('user_videos')
             .select('*')
             .eq('tab_type', tabType)
-            .order('upload_date', { ascending: false, nullsFirst: false })
             .order('created_at', { ascending: false })
+            .order('upload_date', { ascending: false, nullsFirst: false })
             .range(from, from + pageSize - 1);
           
           data = result.data;
@@ -84,8 +84,8 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
             const fallbackResult = await (supabase as any)
               .from('user_videos')
               .select('*')
-              .order('upload_date', { ascending: false, nullsFirst: false })
               .order('created_at', { ascending: false })
+              .order('upload_date', { ascending: false, nullsFirst: false })
               .range(from, from + pageSize - 1);
             data = fallbackResult.data;
             error = fallbackResult.error;
@@ -94,8 +94,8 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
           const result = await (supabase as any)
             .from('user_videos')
             .select('*')
-            .order('upload_date', { ascending: false, nullsFirst: false })
             .order('created_at', { ascending: false })
+            .order('upload_date', { ascending: false, nullsFirst: false })
             .range(from, from + pageSize - 1);
           data = result.data;
           error = result.error;

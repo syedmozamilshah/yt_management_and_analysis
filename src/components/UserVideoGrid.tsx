@@ -96,8 +96,8 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
         query = query.eq('tab_type', tabType);
         
         query = query
-          .order('upload_date', { ascending: false, nullsFirst: false })
           .order('created_at', { ascending: false })
+          .order('upload_date', { ascending: false, nullsFirst: false })
           .range(from, from + pageSize - 1);
         
         const { data, error } = await query;
@@ -111,8 +111,8 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
               .from('user_videos')
               .select('id, title, youtube_url, video_id, thumbnail_url, channel_name, channel_subscribers, upload_date, view_count, niche, is_favorite, created_at')
               .eq('user_id', user.id)
-              .order('upload_date', { ascending: false, nullsFirst: false })
               .order('created_at', { ascending: false })
+              .order('upload_date', { ascending: false, nullsFirst: false })
               .range(from, from + pageSize - 1);
             
             if (fallbackError) {
@@ -170,6 +170,17 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
       }
       
       const deduplicatedVideos = Array.from(videoMap.values());
+      
+      // Sort by upload_date descending (newest first) so new videos always appear at top
+      deduplicatedVideos.sort((a, b) => {
+        const dateA = a.upload_date ? new Date(a.upload_date).getTime() : 0;
+        const dateB = b.upload_date ? new Date(b.upload_date).getTime() : 0;
+        if (dateB !== dateA) return dateB - dateA;
+        // Secondary sort by created_at descending
+        const createdA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const createdB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return createdB - createdA;
+      });
       
       return deduplicatedVideos;
     },
@@ -300,20 +311,35 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
     const pollForNewVideos = async () => {
       try {
         console.log('Polling RSS feeds for new videos...');
-        // Trigger server-side RSS polling
-        const { error } = await supabase.functions.invoke('poll-rss-feeds', {
+        // Trigger server-side RSS polling with a timeout
+        const pollPromise = supabase.functions.invoke('poll-rss-feeds', {
           body: {}
         });
         
+        // Add a 60-second timeout to prevent hanging (RSS polling can be slow)
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('poll-rss-feeds timed out after 60s')), 60000)
+        );
+        
+        const { data: pollData, error } = await Promise.race([pollPromise, timeoutPromise]) as any;
+        
         if (error) {
           console.error('Error polling RSS feeds:', error);
-          return;
+        } else {
+          console.log('RSS poll result:', pollData);
         }
         
-        // After polling, sync any new videos to this user
-        const { data: syncCount } = await (supabase as any).rpc('sync_missed_videos_for_user', {
+        // Always try to sync missed videos regardless of poll result
+        console.log('Syncing missed videos after poll for user:', user.id);
+        const { data: syncCount, error: syncError } = await (supabase as any).rpc('sync_missed_videos_for_user', {
           p_user_id: user.id
         });
+        
+        if (syncError) {
+          console.error('Error syncing missed videos after poll:', syncError);
+        } else {
+          console.log('Sync result after poll:', syncCount);
+        }
         
         if (syncCount && syncCount > 0) {
           console.log(`Found ${syncCount} new videos from RSS poll`);
@@ -325,14 +351,26 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
         }
       } catch (err) {
         console.error('Failed to poll for new videos:', err);
+        // Still try to sync even if polling failed
+        try {
+          const { data: syncCount } = await (supabase as any).rpc('sync_missed_videos_for_user', {
+            p_user_id: user.id
+          });
+          if (syncCount && syncCount > 0) {
+            console.log(`Synced ${syncCount} videos (poll failed but sync succeeded)`);
+            queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
+          }
+        } catch (syncErr) {
+          console.error('Sync also failed:', syncErr);
+        }
       }
     };
 
     // Initial poll after 5 seconds
     const initialPoll = setTimeout(pollForNewVideos, 5000);
     
-    // Then poll every 30 seconds
-    const pollInterval = setInterval(pollForNewVideos, 30000);
+    // Then poll every 90 seconds (slower to reduce server load and timeout issues)
+    const pollInterval = setInterval(pollForNewVideos, 90000);
 
     return () => {
       clearTimeout(initialPoll);
@@ -353,8 +391,25 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
         
         if (error) {
           console.error('Error syncing missed videos:', error);
+          // Try force sync as fallback if regular sync fails
+          console.log('Trying force_sync_all_videos_for_user as fallback...');
+          const { data: forceData, error: forceError } = await (supabase as any).rpc('force_sync_all_videos_for_user', {
+            p_user_id: user.id
+          });
+          if (forceError) {
+            console.error('Force sync also failed:', forceError);
+          } else if (forceData && forceData > 0) {
+            console.log(`Force synced ${forceData} videos`);
+            queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
+            toast({
+              title: "Videos Synced",
+              description: `${forceData} video${forceData > 1 ? 's' : ''} synced from your tracked channels.`,
+            });
+          }
           return;
         }
+        
+        console.log('Sync missed videos result:', data);
         
         if (data && data > 0) {
           console.log(`Synced ${data} missed videos`);
@@ -364,6 +419,47 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
             title: "Videos Synced",
             description: `${data} new video${data > 1 ? 's' : ''} added from your tracked channels.`,
           });
+        } else {
+          console.log('No missed videos to sync (returned 0 or null), trying force sync...');
+          // Try force sync when regular sync returns 0
+          try {
+            console.log('Calling force_sync_all_videos_for_user...');
+            const { data: forceData, error: forceError } = await (supabase as any).rpc('force_sync_all_videos_for_user', {
+              p_user_id: user.id
+            });
+            
+            if (forceError) {
+              console.error('Force sync error:', forceError);
+              // Fall back to auto-discover if force sync fails
+              console.log('Triggering auto-discover-videos as fallback...');
+              const { data: discoverData, error: discoverError } = await supabase.functions.invoke('auto-discover-videos', {
+                body: {}
+              });
+              if (discoverError) {
+                console.error('Auto-discover error:', discoverError);
+              } else {
+                console.log('Auto-discover result:', discoverData);
+                if (discoverData?.totalNewVideos > 0) {
+                  queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
+                  toast({
+                    title: "New Videos Found!",
+                    description: `${discoverData.totalNewVideos} new video${discoverData.totalNewVideos > 1 ? 's' : ''} discovered.`,
+                  });
+                }
+              }
+            } else {
+              console.log('Force sync result:', forceData);
+              if (forceData && forceData > 0) {
+                queryClient.invalidateQueries({ queryKey: ['user-videos', user.id] });
+                toast({
+                  title: "Videos Synced",
+                  description: `${forceData} video${forceData > 1 ? 's' : ''} synced from your tracked channels.`,
+                });
+              }
+            }
+          } catch (forceErr) {
+            console.error('Force sync failed:', forceErr);
+          }
         }
       } catch (err) {
         console.error('Failed to sync missed videos:', err);

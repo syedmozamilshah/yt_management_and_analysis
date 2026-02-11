@@ -63,14 +63,60 @@ export const VideoDetailsModal: React.FC<VideoDetailsModalProps> = ({
     window.open(video.youtube_url, '_blank');
   };
 
+  // Clipboard helper with fallback for non-secure contexts
+  const copyToClipboard = async (text: string): Promise<boolean> => {
+    // Always try fallback first to avoid focus issues
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      textarea.style.top = '-9999px';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      if (success) {
+        console.log('Clipboard copy successful via execCommand');
+        return true;
+      }
+    } catch (err) {
+      console.warn('execCommand clipboard copy failed:', err);
+    }
+    
+    // Try modern clipboard API as secondary fallback
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        console.log('Clipboard copy successful via navigator.clipboard');
+        return true;
+      } catch (err) {
+        console.warn('navigator.clipboard.writeText also failed:', err);
+      }
+    }
+    
+    return false;
+  };
+
   const handleCopyTranscript = async () => {
+    // If transcript already loaded, just copy it
     if (transcript) {
       try {
-        await navigator.clipboard.writeText(transcript);
-        toast({
-          title: "Copied!",
-          description: "Transcript copied to clipboard"
-        });
+        const success = await copyToClipboard(transcript);
+        if (success) {
+          toast({
+            title: "Copied!",
+            description: "Transcript copied to clipboard"
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to copy to clipboard",
+            variant: "destructive"
+          });
+        }
       } catch (err) {
         console.error('Clipboard write failed:', err);
         toast({
@@ -82,12 +128,14 @@ export const VideoDetailsModal: React.FC<VideoDetailsModalProps> = ({
       return;
     }
 
+    // Need to fetch transcript first
     setIsLoadingTranscript(true);
     try {
       const result = await getVideoTranscript(video.video_id);
       console.log('Transcript result:', result);
       
       if (!result.transcript || result.transcript.trim() === '') {
+        setIsLoadingTranscript(false);
         toast({
           title: "No Transcript",
           description: "This video doesn't have captions available.",
@@ -96,12 +144,25 @@ export const VideoDetailsModal: React.FC<VideoDetailsModalProps> = ({
         return;
       }
       
+      // Store transcript in state first
       setTranscript(result.transcript);
-      await navigator.clipboard.writeText(result.transcript);
-      toast({
-        title: "Copied!",
-        description: "Transcript copied to clipboard"
-      });
+      
+      // Give state update time to complete, then copy
+      setTimeout(async () => {
+        const success = await copyToClipboard(result.transcript);
+        if (success) {
+          toast({
+            title: "Copied!",
+            description: "Transcript copied to clipboard"
+          });
+        } else {
+          toast({
+            title: "Transcript Loaded",
+            description: "Transcript loaded but could not copy to clipboard automatically. Click 'Copy Transcript' again.",
+          });
+        }
+        setIsLoadingTranscript(false);
+      }, 100);
     } catch (error) {
       console.error('Error fetching transcript:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -112,7 +173,6 @@ export const VideoDetailsModal: React.FC<VideoDetailsModalProps> = ({
           : "Failed to fetch transcript. The service may be temporarily unavailable.",
         variant: "destructive"
       });
-    } finally {
       setIsLoadingTranscript(false);
     }
   };

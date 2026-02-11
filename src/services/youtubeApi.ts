@@ -40,8 +40,14 @@ export async function searchYouTube(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("API Error Response:", errorText);
+      console.error("API Error Response:", errorText.substring(0, 500));
       throw new Error(`YouTube search failed: ${response.status} ${response.statusText}`);
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.error(`Invalid content type for search: ${contentType}. Got HTML or non-JSON response.`);
+      return [];
     }
 
     const data = await response.json();
@@ -49,7 +55,8 @@ export async function searchYouTube(
     return parseSearchResults(data.results || []);
   } catch (error) {
     console.error("Fetch error:", error);
-    throw error;
+    // Return empty array instead of throwing to allow fallback strategies
+    return [];
   }
 }
 
@@ -98,8 +105,14 @@ export async function searchChannel(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("API Error Response:", errorText);
+      console.error("API Error Response:", errorText.substring(0, 500));
       throw new Error(`Channel search failed: ${response.status} ${response.statusText}`);
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.error(`Invalid content type for channel search: ${contentType}. Got HTML or non-JSON response.`);
+      return [];
     }
 
     const data = await response.json();
@@ -110,7 +123,8 @@ export async function searchChannel(
     return parseSearchResults(results);
   } catch (error) {
     console.error("Channel search error:", error);
-    throw error;
+    // Return empty array instead of throwing to allow fallback strategies
+    return [];
   }
 }
 
@@ -158,16 +172,47 @@ export async function getChannelVideos(
 }
 
 /**
+ * Safely parse a value that might be a JSON string into an object/array
+ */
+function safeJsonParse(value: any): any {
+  if (typeof value === 'string') {
+    // If it's HTML (starts with < or contains <!DOCTYPE), return null
+    if (value.trim().startsWith('<') || value.includes('<!DOCTYPE')) {
+      console.error('Received HTML response instead of JSON. API may be returning an error page.');
+      return null;
+    }
+    try {
+      return JSON.parse(value);
+    } catch (e) {
+      console.warn('Failed to JSON.parse string value, length:', value.length, 'error:', e);
+      return null;
+    }
+  }
+  return value;
+}
+
+/**
  * Parse raw YouTube search results into structured format
  */
 function parseSearchResults(results: any): YouTubeSearchResult[] {
-  // Ensure results is an array
-  if (!results || !Array.isArray(results)) {
-    console.warn("parseSearchResults received non-array:", typeof results);
+  // If results is a JSON string, parse it first
+  let parsed = safeJsonParse(results);
+
+  // If parsing failed or returned null, return empty array
+  if (!parsed) {
+    console.warn("parseSearchResults: Could not parse results, returning empty array");
     return [];
   }
 
-  return results
+  // Ensure results is an array
+  if (!Array.isArray(parsed)) {
+    console.warn("parseSearchResults received non-array after parsing:", typeof parsed);
+    return [];
+  }
+
+  const results_array = parsed;
+
+  return parsed
     .filter((item) => {
       // Allow video results (have videoId) or channel results (have channelId/browseId)
       const hasVideoId = item.videoId || item.navigationEndpoint?.watchEndpoint?.videoId;

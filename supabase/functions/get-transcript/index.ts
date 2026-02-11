@@ -11,7 +11,8 @@ serve(async (req) => {
   }
 
   try {
-    const { videoId } = await req.json()
+    const body = await req.json() as { videoId?: string }
+    const videoId = body?.videoId
 
     if (!videoId) {
       return new Response(
@@ -42,23 +43,57 @@ serve(async (req) => {
 
     const html = await pageResponse.text()
     
-    // Extract ytInitialPlayerResponse
-    const playerResponseMatch = html.match(/var ytInitialPlayerResponse\s*=\s*(\{.+?\});/)
+    // Extract ytInitialPlayerResponse - try multiple patterns
+    let playerResponseMatch = html.match(/var ytInitialPlayerResponse\s*=\s*(\{.+?\})\s*;\s*var/)
     if (!playerResponseMatch) {
-      // Try alternative pattern
-      const altMatch = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\});/)
-      if (!altMatch) {
-        console.log('Could not find player response in page')
-        return new Response(
-          JSON.stringify({ error: 'Could not extract video data', transcript: '', videoId }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+      // Try broader pattern
+      playerResponseMatch = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\})\s*;/)
+    }
+    if (!playerResponseMatch) {
+      // Try pattern that captures until the end marker more reliably 
+      const startIdx = html.indexOf('var ytInitialPlayerResponse = ')
+      if (startIdx === -1) {
+        const altIdx = html.indexOf('ytInitialPlayerResponse = ')
+        if (altIdx === -1) {
+          console.log('Could not find player response in page')
+          return new Response(
+            JSON.stringify({ error: 'Could not extract video data', transcript: '', videoId }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        // Extract the JSON manually by finding balanced braces
+        const jsonStart = html.indexOf('{', altIdx)
+        if (jsonStart !== -1) {
+          const jsonStr = extractBalancedJson(html, jsonStart)
+          if (jsonStr) {
+            playerResponseMatch = [jsonStr, jsonStr] as any
+          }
+        }
+      } else {
+        const jsonStart = html.indexOf('{', startIdx)
+        if (jsonStart !== -1) {
+          const jsonStr = extractBalancedJson(html, jsonStart)
+          if (jsonStr) {
+            playerResponseMatch = [jsonStr, jsonStr] as any
+          }
+        }
       }
+    }
+
+    if (!playerResponseMatch) {
+      console.log('Could not extract player response from page')
+      return new Response(
+        JSON.stringify({ error: 'Could not extract video data', transcript: '', videoId }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     let playerResponse: any
     try {
-      const jsonStr = playerResponseMatch ? playerResponseMatch[1] : ''
+      const jsonStr = playerResponseMatch[1]
+      if (!jsonStr) {
+        throw new Error('Empty JSON string from player response match')
+      }
       playerResponse = JSON.parse(jsonStr)
     } catch (e) {
       console.error('Failed to parse player response:', e)
@@ -142,6 +177,43 @@ serve(async (req) => {
     )
   }
 })
+
+function extractBalancedJson(text: string, startIndex: number): string | null {
+  let depth = 0
+  let inString = false
+  let escapeNext = false
+  
+  for (let i = startIndex; i < text.length && i < startIndex + 500000; i++) {
+    const char = text[i]
+    
+    if (escapeNext) {
+      escapeNext = false
+      continue
+    }
+    
+    if (char === '\\' && inString) {
+      escapeNext = true
+      continue
+    }
+    
+    if (char === '"' && !escapeNext) {
+      inString = !inString
+      continue
+    }
+    
+    if (!inString) {
+      if (char === '{') depth++
+      else if (char === '}') {
+        depth--
+        if (depth === 0) {
+          return text.substring(startIndex, i + 1)
+        }
+      }
+    }
+  }
+  
+  return null
+}
 
 function decodeHtmlEntities(text: string): string {
   return text

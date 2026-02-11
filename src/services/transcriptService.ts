@@ -129,8 +129,12 @@ async function fetchViaScrapingBee(videoId: string): Promise<TranscriptResult> {
     video_id: videoId,
   });
 
-  const url = `https://app.scrapingbee.com/api/v1/youtube/transcript?${params.toString()}`;
-  console.log('Fetching from ScrapingBee...');
+  // Use proxy in development to avoid CORS, direct URL in production
+  const baseUrl = import.meta.env.DEV
+    ? '/api/scrapingbee/youtube/transcript'
+    : 'https://app.scrapingbee.com/api/v1/youtube/transcript';
+  const url = `${baseUrl}?${params.toString()}`;
+  console.log('Fetching from ScrapingBee...', import.meta.env.DEV ? '(via proxy)' : '(direct)');
 
   const response = await fetch(url);
 
@@ -311,6 +315,36 @@ function getAIToolUrl(aiTool: 'claude' | 'gemini' | 'gpt'): string {
 }
 
 /**
+ * Clipboard helper with fallback for non-secure contexts
+ */
+async function copyToClipboardFallback(text: string): Promise<boolean> {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (err) {
+      console.warn('navigator.clipboard.writeText failed, trying fallback:', err);
+    }
+  }
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    textarea.style.top = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const success = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return success;
+  } catch (err) {
+    console.error('Fallback clipboard copy failed:', err);
+    return false;
+  }
+}
+
+/**
  * Open AI tool with prompt and transcript
  * Copies the prompt + transcript to clipboard, shows a toast, waits 1.5s, then opens the AI tool
  */
@@ -327,14 +361,16 @@ export async function openAIWithTranscript(
   if (!url) return;
   
   try {
-    // Copy prompt + transcript to clipboard
-    await navigator.clipboard.writeText(fullPrompt);
+    // Copy prompt + transcript to clipboard using fallback-safe method
+    const success = await copyToClipboardFallback(fullPrompt);
     
     // Show toast notification if callback provided
     if (showToast) {
       showToast({
-        title: "Copied to Clipboard!",
-        description: `Transcript with Prompt has been copied. Opening ${toolName}... Use Ctrl+V to paste in ${toolName}.`
+        title: success ? "Copied to Clipboard!" : "Could not copy",
+        description: success 
+          ? `Transcript with Prompt has been copied. Opening ${toolName}... Use Ctrl+V to paste in ${toolName}.`
+          : `Opening ${toolName}... You may need to copy the transcript manually.`
       });
     }
     
