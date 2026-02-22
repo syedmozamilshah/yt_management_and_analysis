@@ -45,12 +45,55 @@ export const TitleResults: React.FC<TitleResultsProps> = ({
   // Use totalAnalyzed if provided, otherwise fall back to referenceVideos length
   const videosAnalyzedCount = totalAnalyzed || referenceVideos.length;
 
-  const copyTitle = (title: string) => {
-    navigator.clipboard.writeText(title);
-    toast({
-      title: "Copied! 🎉",
-      description: "Title copied to your clipboard - go make that amazing video!"
-    });
+  // Clipboard helper with fallback for non-secure contexts
+  const copyToClipboard = async (text: string): Promise<boolean> => {
+    // Try fallback first to avoid focus issues
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      textarea.style.top = '-9999px';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      if (success) {
+        return true;
+      }
+    } catch (err) {
+      console.warn('execCommand clipboard copy failed:', err);
+    }
+    
+    // Try modern clipboard API as secondary fallback
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (err) {
+        console.warn('navigator.clipboard.writeText also failed:', err);
+      }
+    }
+    
+    return false;
+  };
+
+  const copyTitle = async (title: string) => {
+    const success = await copyToClipboard(title);
+    if (success) {
+      toast({
+        title: "Copied! 🎉",
+        description: "Title copied to your clipboard - go make that amazing video!"
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to copy to clipboard",
+        variant: "destructive"
+      });
+    }
   };
 
   // Calculate statistics

@@ -325,12 +325,55 @@ const ScriptGenerator = ({
     setError("");
   };
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: "Copied!",
-      description: "Content copied to clipboard.",
-    });
+  // Clipboard helper with fallback for non-secure contexts
+  const copyToClipboard = async (text: string): Promise<boolean> => {
+    // Try fallback first to avoid focus issues
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      textarea.style.top = '-9999px';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      if (success) {
+        return true;
+      }
+    } catch (err) {
+      console.warn('execCommand clipboard copy failed:', err);
+    }
+    
+    // Try modern clipboard API as secondary fallback
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (err) {
+        console.warn('navigator.clipboard.writeText also failed:', err);
+      }
+    }
+    
+    return false;
+  };
+
+  const handleCopy = async (text: string) => {
+    const success = await copyToClipboard(text);
+    if (success) {
+      toast({
+        title: "Copied!",
+        description: "Content copied to clipboard.",
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to copy to clipboard.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Loading skeleton
