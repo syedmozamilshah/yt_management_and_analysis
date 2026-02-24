@@ -96,6 +96,36 @@ const ChannelTracker: React.FC = () => {
     }
   }, [user, fetchData]);
 
+  // On mount, trigger an RSS poll in the background to catch any new videos
+  // Then re-fetch local data so the UI is up-to-date
+  useEffect(() => {
+    if (!user) return;
+
+    const initialPoll = setTimeout(async () => {
+      try {
+        console.log('Channel Tracker: initial RSS poll on mount...');
+        const { error } = await supabase.functions.invoke('poll-rss-feeds');
+        if (error) {
+          console.warn('Initial RSS poll error:', error);
+        }
+        // Also sync missed videos into user_videos for the main app tabs
+        try {
+          await (supabase as any).rpc('sync_missed_videos_for_user', {
+            p_user_id: user.id
+          });
+        } catch (syncErr) {
+          console.warn('Sync missed videos error:', syncErr);
+        }
+        // Re-fetch data after poll completes
+        await fetchData();
+      } catch (err) {
+        console.warn('Channel Tracker: initial poll failed:', err);
+      }
+    }, 3000); // 3s delay so the page loads first
+
+    return () => clearTimeout(initialPoll);
+  }, [user, fetchData]);
+
   // Auto-refresh every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
@@ -192,6 +222,17 @@ const ChannelTracker: React.FC = () => {
 
       // Reload local lists after polling completes
       await fetchData();
+
+      // Also sync missed videos into user_videos for the main app tabs
+      if (user) {
+        try {
+          await (supabase as any).rpc('sync_missed_videos_for_user', {
+            p_user_id: user.id
+          });
+        } catch (syncErr) {
+          console.warn('Sync missed videos after refresh error:', syncErr);
+        }
+      }
     } catch (err) {
       console.error('Refresh error:', err);
       toast({

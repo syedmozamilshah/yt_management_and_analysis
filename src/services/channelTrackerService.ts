@@ -228,6 +228,7 @@ export async function resubscribeAllChannels(): Promise<{ success: number; faile
 /**
  * Add a new channel and subscribe to webhooks
  * Now uses analyzeChannel for initial setup (minimal quota)
+ * Then persists the initial videos into tracked_videos via fetchChannelVideos
  */
 export async function addTrackedChannel(channelUrl: string, fetchDays: number = 7): Promise<AnalyzeChannelResponse> {
   // Get current user
@@ -258,6 +259,20 @@ export async function addTrackedChannel(channelUrl: string, fetchDays: number = 
       });
   } catch (error) {
     console.warn('Failed to save tracked channel:', error);
+  }
+  
+  // CRITICAL: Persist initial videos into tracked_videos so they appear in the UI
+  // analyze-channel only returns videos; it does NOT insert them into tracked_videos.
+  // fetchChannelVideos reads the RSS feed again and inserts into tracked_videos,
+  // which triggers auto_sync_video_to_users to sync them into user_videos.
+  if (result.rss_feed_url && fetchDays > 0) {
+    try {
+      const fetchResult = await fetchChannelVideos(result.channel_id, result.rss_feed_url, fetchDays);
+      console.log(`Persisted ${fetchResult.videos_inserted} initial videos for channel ${result.channel_id}`);
+    } catch (error) {
+      console.warn('Failed to persist initial videos (will be picked up by RSS poll):', error);
+      // Don't fail the whole operation - RSS polling will catch them eventually
+    }
   }
   
   // Subscribe to webhooks for real-time notifications
