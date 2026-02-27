@@ -70,8 +70,8 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
             .from('user_videos')
             .select('*')
             .eq('tab_type', tabType)
-            .order('created_at', { ascending: false })
             .order('upload_date', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false })
             .range(from, from + pageSize - 1);
           
           data = result.data;
@@ -84,8 +84,8 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
             const fallbackResult = await (supabase as any)
               .from('user_videos')
               .select('*')
-              .order('created_at', { ascending: false })
               .order('upload_date', { ascending: false, nullsFirst: false })
+              .order('created_at', { ascending: false })
               .range(from, from + pageSize - 1);
             data = fallbackResult.data;
             error = fallbackResult.error;
@@ -94,8 +94,8 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
           const result = await (supabase as any)
             .from('user_videos')
             .select('*')
-            .order('created_at', { ascending: false })
             .order('upload_date', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false })
             .range(from, from + pageSize - 1);
           data = result.data;
           error = result.error;
@@ -151,14 +151,37 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
       
       const deduplicatedVideos = Array.from(videoMap.values());
       
+      // Sort by upload_date descending (newest first) so new videos always appear at top
+      deduplicatedVideos.sort((a, b) => {
+        const dateA = a.upload_date ? new Date(a.upload_date).getTime() : 0;
+        const dateB = b.upload_date ? new Date(b.upload_date).getTime() : 0;
+        if (dateB !== dateA) return dateB - dateA;
+        // Secondary sort by created_at descending
+        const createdA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const createdB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return createdB - createdA;
+      });
+      
       return deduplicatedVideos;
     },
-    staleTime: 60000, // Cache for 60 seconds
-    refetchOnMount: false, // Don't refetch on every mount
+    staleTime: 30000, // Cache for 30 seconds (reduced from 60s for faster updates)
+    refetchOnMount: true, // Refetch on mount to catch new videos
   });
 
   // Real-time subscription for new videos (when admin adds videos for all users)
+  // Debounced to prevent infinite refetch loops from bulk syncs
+  const adminRealtimeDebounceRef = React.useRef<NodeJS.Timeout | null>(null);
+
   React.useEffect(() => {
+    const debouncedInvalidate = () => {
+      if (adminRealtimeDebounceRef.current) {
+        clearTimeout(adminRealtimeDebounceRef.current);
+      }
+      adminRealtimeDebounceRef.current = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['all-users-videos', tabType] });
+      }, 3000); // Wait 3s after last event before refetching
+    };
+
     const userVideosChannel = supabase
       .channel(`all-users-videos-realtime-${tabType}`)
       .on(
@@ -169,17 +192,36 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
           table: 'user_videos',
         },
         (payload: any) => {
-          // Only refresh if video belongs to current tab (or if tab_type column doesn't exist)
           if (!payload.new?.tab_type || payload.new?.tab_type === tabType) {
-            console.log('Admin Real-time: New video added for tab', tabType, payload.new);
-            queryClient.invalidateQueries({ queryKey: ['all-users-videos', tabType] });
+            debouncedInvalidate();
           }
         }
       )
       .subscribe();
 
+    // Also subscribe to tracked_videos for new channel uploads
+    const trackedVideosChannel = supabase
+      .channel(`admin-tracked-videos-realtime-${tabType}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'tracked_videos',
+        },
+        (payload: any) => {
+          console.log('Admin Real-time: New tracked video discovered', payload.new);
+          debouncedInvalidate();
+        }
+      )
+      .subscribe();
+
     return () => {
+      if (adminRealtimeDebounceRef.current) {
+        clearTimeout(adminRealtimeDebounceRef.current);
+      }
       supabase.removeChannel(userVideosChannel);
+      supabase.removeChannel(trackedVideosChannel);
     };
   }, [queryClient, tabType]);
 
@@ -188,25 +230,49 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
     const pollForNewVideos = async () => {
       try {
         console.log('Admin: Polling RSS feeds for new videos...');
-        // Trigger server-side RSS polling
-        const { error } = await supabase.functions.invoke('poll-rss-feeds', {
+        // Trigger server-side RSS polling with timeout
+        const pollPromise = supabase.functions.invoke('poll-rss-feeds', {
           body: {}
         });
         
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('poll-rss-feeds timed out after 60s')), 60000)
+        );
+        
+        const { data: pollData, error } = await Promise.race([pollPromise, timeoutPromise]) as any;
+        
         if (error) {
           console.error('Error polling RSS feeds:', error);
-          return;
+        } else {
+          console.log('Admin RSS poll result:', pollData);
         }
         
-        // Refetch to show any new videos
-        refetch();
+        // Sync missed videos for ALL users to catch any videos
+        // that exist in tracked_videos but weren't synced to user_videos
+        try {
+          console.log('Admin: Syncing missed videos for ALL users...');
+          const { data: syncCount, error: syncError } = await (supabase as any).rpc('sync_missed_videos_for_all_users');
+          
+          if (syncError) {
+            console.error('Error syncing missed videos for all users:', syncError);
+          } else if (syncCount && syncCount > 0) {
+            console.log(`Admin: Synced ${syncCount} missed video-user pairs across all users`);
+          }
+        } catch (syncErr) {
+          console.error('Failed to sync missed videos for all users:', syncErr);
+        }
+        
+        // Invalidate and refetch to show any new videos
+        queryClient.invalidateQueries({ queryKey: ['all-users-videos', tabType] });
       } catch (err) {
         console.error('Failed to poll for new videos:', err);
+        // Still try to refetch even if poll failed
+        queryClient.invalidateQueries({ queryKey: ['all-users-videos', tabType] });
       }
     };
 
-    // Initial poll after 5 seconds
-    const initialPoll = setTimeout(pollForNewVideos, 5000);
+    // Initial poll after 3 seconds (reduced from 5s for faster first load)
+    const initialPoll = setTimeout(pollForNewVideos, 3000);
     
     // Then poll every 30 seconds
     const pollInterval = setInterval(pollForNewVideos, 30000);
@@ -215,7 +281,7 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
       clearTimeout(initialPoll);
       clearInterval(pollInterval);
     };
-  }, [refetch]);
+  }, [refetch, queryClient, tabType]);
 
   // Update filters when data changes
   React.useEffect(() => {

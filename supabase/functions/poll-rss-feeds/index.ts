@@ -374,7 +374,25 @@ serve(async (req: Request) => {
       console.log(`Updated view counts for ${updatedCount} existing videos`)
     }
 
-    console.log(`RSS polling job completed. Polled: ${polled}, Videos inserted: ${totalVideosInserted}`)
+    // Phase 5: Sync missed videos to ALL users' ideation/tabs
+    // This catches any videos that the trigger missed (timing, activity checks, etc.)
+    let totalUsersSynced = 0
+    try {
+      console.log('Phase 5: Syncing missed videos for ALL users...')
+      const { data: syncCount, error: syncError } = await supabase
+        .rpc('sync_missed_videos_for_all_users')
+
+      if (syncError) {
+        console.error('Error syncing missed videos for all users:', syncError)
+      } else {
+        totalUsersSynced = syncCount || 0
+        console.log(`Synced ${totalUsersSynced} missed video-user pairs across all users`)
+      }
+    } catch (syncErr) {
+      console.error('Failed to sync missed videos for all users:', syncErr)
+    }
+
+    console.log(`RSS polling job completed. Polled: ${polled}, Videos inserted: ${totalVideosInserted}, Users synced: ${totalUsersSynced}`)
 
     return new Response(
       JSON.stringify({
@@ -382,6 +400,7 @@ serve(async (req: Request) => {
         message: `Polled ${polled} channels`,
         polled,
         total_videos_inserted: totalVideosInserted,
+        total_users_synced: totalUsersSynced,
         results
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

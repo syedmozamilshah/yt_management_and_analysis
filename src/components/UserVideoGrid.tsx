@@ -96,8 +96,8 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
         query = query.eq('tab_type', tabType);
         
         query = query
-          .order('created_at', { ascending: false })
           .order('upload_date', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false })
           .range(from, from + pageSize - 1);
         
         const { data, error } = await query;
@@ -111,8 +111,8 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
               .from('user_videos')
               .select('id, title, youtube_url, video_id, thumbnail_url, channel_name, channel_subscribers, upload_date, view_count, niche, is_favorite, created_at')
               .eq('user_id', user.id)
-              .order('created_at', { ascending: false })
               .order('upload_date', { ascending: false, nullsFirst: false })
+              .order('created_at', { ascending: false })
               .range(from, from + pageSize - 1);
             
             if (fallbackError) {
@@ -185,12 +185,16 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
       return deduplicatedVideos;
     },
     enabled: !!user?.id,
-    staleTime: 60000, // Cache for 60 seconds to avoid excessive refetches
-    refetchOnMount: false, // Don't refetch on every mount
+    staleTime: 15000, // Cache for 15 seconds for faster updates
+    refetchOnMount: true, // Refetch on mount to catch new videos
     retry: 2,
   });
 
   // Real-time subscription for new videos (e.g., when admin adds videos for all users)
+  // Uses debouncing to prevent infinite refetch loops from bulk syncs
+  const realtimeInsertCountRef = useRef(0);
+  const realtimeDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     if (!user?.id) return;
 
@@ -207,14 +211,30 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
           filter: `user_id=eq.${user.id}`,
         },
         (payload: any) => {
-          // Only show notification if the video belongs to the current tab
+          // Only process if video belongs to the current tab
           if (payload.new?.tab_type === tabType) {
-            console.log('Real-time: New video added for tab', tabType, payload.new);
-            queryClient.invalidateQueries({ queryKey: ['user-videos', user.id, tabType] });
-            toast({
-              title: "New Video Added",
-              description: `A new video has been added to your ${tabType.toUpperCase()} tab.`,
-            });
+            // Count inserts and debounce - bulk syncs fire many INSERTs at once
+            realtimeInsertCountRef.current += 1;
+            
+            if (realtimeDebounceRef.current) {
+              clearTimeout(realtimeDebounceRef.current);
+            }
+            
+            // Wait 3 seconds after the LAST insert before refetching
+            // This batches dozens of rapid inserts into a single refetch
+            realtimeDebounceRef.current = setTimeout(() => {
+              const count = realtimeInsertCountRef.current;
+              realtimeInsertCountRef.current = 0;
+              console.log(`Real-time: ${count} new video(s) added for tab ${tabType}, refreshing...`);
+              queryClient.invalidateQueries({ queryKey: ['user-videos', user.id, tabType] });
+              if (count <= 3) {
+                // Only show toast for small batches (not bulk syncs)
+                toast({
+                  title: "New Video Added",
+                  description: `${count} new video${count > 1 ? 's have' : ' has'} been added to your ${tabType} tab.`,
+                });
+              }
+            }, 3000);
           }
         }
       )
@@ -243,7 +263,7 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
         },
         (payload: any) => {
           console.log('Real-time: Video deleted', payload.old);
-          queryClient.invalidateQueries({ queryKey: ['user-videos', user.id, tabType] });
+          debouncedRefetch();
         }
       )
       .subscribe((status) => {
@@ -262,19 +282,20 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
         },
         (payload) => {
           console.log('Real-time: New tracked video', payload.new);
-          // Refetch user videos as the trigger should have synced it
-          setTimeout(() => {
-            queryClient.invalidateQueries({ queryKey: ['user-videos', user.id, tabType] });
-          }, 1000); // Small delay to allow trigger to complete
+          // Use debounced refetch - the trigger will sync to user_videos
+          debouncedRefetch();
         }
       )
       .subscribe();
 
     return () => {
+      if (realtimeDebounceRef.current) {
+        clearTimeout(realtimeDebounceRef.current);
+      }
       supabase.removeChannel(userVideosChannel);
       supabase.removeChannel(trackedVideosChannel);
     };
-  }, [user?.id, tabType, queryClient, toast]);
+  }, [user?.id, tabType, queryClient, toast, debouncedRefetch]);
 
   // One-time metadata refresh to fix channel_subscribers, niche, upload_date etc.
   useEffect(() => {
