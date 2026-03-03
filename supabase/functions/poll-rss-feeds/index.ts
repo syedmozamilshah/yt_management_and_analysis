@@ -392,7 +392,70 @@ serve(async (req: Request) => {
       console.error('Failed to sync missed videos for all users:', syncErr)
     }
 
-    console.log(`RSS polling job completed. Polled: ${polled}, Videos inserted: ${totalVideosInserted}, Users synced: ${totalUsersSynced}`)
+    // Phase 6: Re-subscribe channels that have expired/missing WebSub subscriptions
+    // This ensures real-time push notifications stay active for all channels
+    let resubscribedCount = 0
+    try {
+      console.log('Phase 6: Re-subscribing expired WebSub channels...')
+      const { data: needsSub, error: subError } = await supabase
+        .rpc('get_channels_needing_subscription')
+
+      if (subError) {
+        console.error('Error fetching channels needing subscription:', subError)
+      } else if (needsSub && needsSub.length > 0) {
+        console.log(`Found ${needsSub.length} channels needing WebSub (re)subscription`)
+        
+        const WEBSUB_HUB_URL = 'https://pubsubhubbub.appspot.com/subscribe'
+        const WEBHOOK_CALLBACK_URL = `${supabaseUrl}/functions/v1/webhooks-youtube`
+
+        // Limit to 20 channels per poll cycle to avoid overloading
+        const channelsToSub = needsSub.slice(0, 20)
+        
+        for (const ch of channelsToSub) {
+          try {
+            const topicUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${ch.channel_id}`
+            const formData = new URLSearchParams({
+              'hub.mode': 'subscribe',
+              'hub.topic': topicUrl,
+              'hub.callback': WEBHOOK_CALLBACK_URL,
+              'hub.verify': 'async'
+            })
+
+            const hubResponse = await fetch(WEBSUB_HUB_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: formData.toString()
+            })
+
+            if (hubResponse.ok) {
+              resubscribedCount++
+              console.log(`Re-subscribed channel ${ch.channel_id} to WebSub`)
+            } else {
+              console.error(`Failed to re-subscribe ${ch.channel_id}: ${hubResponse.status}`)
+            }
+
+            // Log the attempt
+            await supabase.from('websub_subscription_logs').insert({
+              channel_id: ch.channel_id,
+              action: 'subscribe',
+              status: hubResponse.ok ? 'pending' : 'failed',
+              hub_response: `Status: ${hubResponse.status} (auto-resubscribe from poll)`
+            })
+
+            // Small delay between requests
+            await new Promise(resolve => setTimeout(resolve, 100))
+          } catch (err) {
+            console.error(`Error re-subscribing ${ch.channel_id}:`, err)
+          }
+        }
+        
+        console.log(`Re-subscribed ${resubscribedCount} channels to WebSub`)
+      }
+    } catch (resubErr) {
+      console.error('Failed to re-subscribe channels:', resubErr)
+    }
+
+    console.log(`RSS polling job completed. Polled: ${polled}, Videos inserted: ${totalVideosInserted}, Users synced: ${totalUsersSynced}, WebSub resubscribed: ${resubscribedCount}`)
 
     return new Response(
       JSON.stringify({
@@ -401,6 +464,7 @@ serve(async (req: Request) => {
         polled,
         total_videos_inserted: totalVideosInserted,
         total_users_synced: totalUsersSynced,
+        websub_resubscribed: resubscribedCount,
         results
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

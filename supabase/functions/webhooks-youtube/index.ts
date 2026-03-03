@@ -247,10 +247,23 @@ serve(async (req: Request) => {
           // CRITICAL: Use the RSS published date, not now()
           const publishedAt = entry.publishedAt
           if (!publishedAt) {
-            console.warn(`WARNING: No published date for video ${entry.videoId}, skipping to avoid wrong timestamp`)
-            continue
+            console.warn(`WARNING: No published date for video ${entry.videoId}, using current time as fallback`)
           }
-          console.log(`Inserting video ${entry.videoId} with published_at: ${publishedAt}`)
+          const effectivePublishedAt = publishedAt || new Date().toISOString()
+          console.log(`Inserting video ${entry.videoId} with published_at: ${effectivePublishedAt}`)
+
+          // Resolve channel_name from tracked_channels for proper display
+          let channelName: string | null = null
+          const { data: channelData } = await supabase
+            .from('tracked_channels')
+            .select('channel_name')
+            .eq('channel_id', entry.channelId)
+            .not('channel_name', 'is', null)
+            .limit(1)
+            .single()
+          if (channelData) {
+            channelName = channelData.channel_name
+          }
           
           const { error: insertError } = await supabase
             .from('tracked_videos')
@@ -260,10 +273,11 @@ serve(async (req: Request) => {
               title: entry.title || 'Untitled',
               thumbnail_url: thumbnailUrl,
               youtube_url: youtubeUrl,
-              published_at: publishedAt,
+              published_at: effectivePublishedAt,
               view_count: viewCount,
               view_count_updated_at: viewCount !== null ? new Date().toISOString() : null,
-              source: 'websub'
+              source: 'websub',
+              channel_name: channelName
             })
 
           if (insertError) {

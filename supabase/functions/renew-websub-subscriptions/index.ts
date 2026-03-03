@@ -132,12 +132,66 @@ serve(async (req: Request) => {
 
     console.log(`Renewal job completed. Renewed: ${renewed}, Failed: ${failed}`)
 
+    // Phase 2: Also subscribe channels that have never been subscribed or fully expired
+    let newSubscriptions = 0
+    try {
+      const { data: needsSub, error: needsSubError } = await supabase
+        .rpc('get_channels_needing_subscription')
+
+      if (needsSubError) {
+        console.error('Error fetching channels needing subscription:', needsSubError)
+      } else if (needsSub && needsSub.length > 0) {
+        console.log(`Found ${needsSub.length} channels needing fresh WebSub subscription`)
+        
+        // Limit to 30 per cycle
+        const toSubscribe = needsSub.slice(0, 30)
+        
+        for (const ch of toSubscribe) {
+          try {
+            const topicUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${ch.channel_id}`
+            const formData = new URLSearchParams({
+              'hub.mode': 'subscribe',
+              'hub.topic': topicUrl,
+              'hub.callback': WEBHOOK_CALLBACK_URL,
+              'hub.verify': 'async'
+            })
+
+            const hubResponse = await fetch(WEBSUB_HUB_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: formData.toString()
+            })
+
+            if (hubResponse.ok) {
+              newSubscriptions++
+            }
+
+            await supabase.from('websub_subscription_logs').insert({
+              channel_id: ch.channel_id,
+              action: 'subscribe',
+              status: hubResponse.ok ? 'pending' : 'failed',
+              hub_response: `Status: ${hubResponse.status} (auto-subscribe from renewal job)`
+            })
+
+            await new Promise(resolve => setTimeout(resolve, 100))
+          } catch (err) {
+            console.error(`Error subscribing ${ch.channel_id}:`, err)
+          }
+        }
+        
+        console.log(`New subscriptions created: ${newSubscriptions}`)
+      }
+    } catch (err) {
+      console.error('Error in new subscription phase:', err)
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Processed ${channelsToRenew.length} channels`,
+        message: `Processed ${channelsToRenew.length} renewals + ${newSubscriptions} new subscriptions`,
         renewed,
         failed,
+        new_subscriptions: newSubscriptions,
         results
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
