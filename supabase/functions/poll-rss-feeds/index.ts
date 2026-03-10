@@ -374,22 +374,35 @@ serve(async (req: Request) => {
       console.log(`Updated view counts for ${updatedCount} existing videos`)
     }
 
-    // Phase 5: Sync missed videos to ALL users' ideation/tabs
-    // This catches any videos that the trigger missed (timing, activity checks, etc.)
-    let totalUsersSynced = 0
+    // Phase 5: Sync ALL tracked videos to users' ideation/tabs
+    // This comprehensive sync catches any videos that the trigger missed
+    // Uses the new sync_all_tracked_videos_to_users() for better reliability
+    let totalVideosSynced = 0
+    let totalUsersAffected = 0
     try {
-      console.log('Phase 5: Syncing missed videos for ALL users...')
-      const { data: syncCount, error: syncError } = await supabase
-        .rpc('sync_missed_videos_for_all_users')
+      console.log('Phase 5: Syncing ALL tracked videos to user ideation...')
+      const { data: syncResults, error: syncError } = await supabase
+        .rpc('sync_all_tracked_videos_to_users')
 
       if (syncError) {
-        console.error('Error syncing missed videos for all users:', syncError)
-      } else {
-        totalUsersSynced = syncCount || 0
-        console.log(`Synced ${totalUsersSynced} missed video-user pairs across all users`)
+        console.error('Error syncing tracked videos:', syncError)
+        // Fall back to old function for backward compatibility
+        console.log('Falling back to sync_missed_videos_for_all_users()...')
+        const { data: fallbackCount, error: fallbackError } = await supabase
+          .rpc('sync_missed_videos_for_all_users')
+        
+        if (!fallbackError) {
+          totalVideosSynced = fallbackCount || 0
+          console.log(`Fallback synced ${totalVideosSynced} missed video-user pairs`)
+        }
+      } else if (syncResults && syncResults.length > 0) {
+        const result = syncResults[0]
+        totalVideosSynced = result.videos_synced || 0
+        totalUsersAffected = result.total_users_affected || 0
+        console.log(`Synced ${totalVideosSynced} videos for ${totalUsersAffected} users in ${result.duration_seconds || 0}s`)
       }
     } catch (syncErr) {
-      console.error('Failed to sync missed videos for all users:', syncErr)
+      console.error('Failed to sync videos:', syncErr)
     }
 
     // Phase 6: Re-subscribe channels that have expired/missing WebSub subscriptions
@@ -455,7 +468,7 @@ serve(async (req: Request) => {
       console.error('Failed to re-subscribe channels:', resubErr)
     }
 
-    console.log(`RSS polling job completed. Polled: ${polled}, Videos inserted: ${totalVideosInserted}, Users synced: ${totalUsersSynced}, WebSub resubscribed: ${resubscribedCount}`)
+    console.log(`RSS polling job completed. Polled: ${polled}, Videos inserted: ${totalVideosInserted}, Videos synced to users: ${totalVideosSynced}, Users affected: ${totalUsersAffected}, WebSub resubscribed: ${resubscribedCount}`)
 
     return new Response(
       JSON.stringify({
@@ -463,7 +476,8 @@ serve(async (req: Request) => {
         message: `Polled ${polled} channels`,
         polled,
         total_videos_inserted: totalVideosInserted,
-        total_users_synced: totalUsersSynced,
+        total_videos_synced_to_users: totalVideosSynced,
+        total_users_affected: totalUsersAffected,
         websub_resubscribed: resubscribedCount,
         results
       }),
