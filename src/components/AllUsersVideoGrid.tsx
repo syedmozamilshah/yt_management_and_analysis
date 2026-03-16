@@ -44,12 +44,28 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Show error toast when accessing disconnected tabs
+  useEffect(() => {
+    const disconnectedTabs = ['ideation', 'usa', 'spanish'];
+    if (disconnectedTabs.includes(tabType)) {
+      toast({
+        title: "Error",
+        description: "Something went wrong",
+        variant: "destructive"
+      });
+    }
+  }, [tabType, toast]);
+
   // Reset filters when tab changes
   useEffect(() => {
     setFilters(defaultFilters);
     setSelectedVideos(new Set());
     setIsSelectionMode(false);
   }, [tabType]);
+
+  // Check if tab is disconnected
+  const disconnectedTabs = ['ideation', 'usa', 'spanish'];
+  const isDisconnected = disconnectedTabs.includes(tabType);
 
   // Fetch ALL users' videos from user_videos table (admin only) for specific tab
   const { data: videos = [], isLoading, refetch } = useQuery({
@@ -452,6 +468,21 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
 
   // Only show loading skeleton on initial load (when we have no cached data)
   const showLoadingSkeleton = isLoading && videos.length === 0;
+
+  // Show empty state for disconnected tabs
+  if (isDisconnected) {
+    return (
+      <div className="bg-[#181818] rounded-2xl border border-[#272727] p-12 text-center">
+        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[#272727] mb-6">
+          <Users className="w-10 h-10 text-[#aaaaaa]" />
+        </div>
+        <h3 className="text-2xl font-bold text-[#f1f1f1] mb-3">No Videos Available</h3>
+        <p className="text-[#aaaaaa] text-lg mb-4 max-w-md mx-auto">
+          This tab is currently unavailable.
+        </p>
+      </div>
+    );
+  }
 
   if (showLoadingSkeleton) {
     return (
