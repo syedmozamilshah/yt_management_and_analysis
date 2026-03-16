@@ -44,17 +44,20 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Check if tab is disconnected (ideation, usa, spanish)
+  const disconnectedTabs = ['ideation', 'usa', 'spanish'];
+  const isDisconnected = disconnectedTabs.includes(tabType);
+
   // Show error toast when accessing disconnected tabs
   useEffect(() => {
-    const disconnectedTabs = ['ideation', 'usa', 'spanish'];
-    if (disconnectedTabs.includes(tabType)) {
+    if (isDisconnected) {
       toast({
         title: "Error",
         description: "Something went wrong",
         variant: "destructive"
       });
     }
-  }, [tabType, toast]);
+  }, [tabType, toast, isDisconnected]);
 
   // Reset filters when tab changes
   useEffect(() => {
@@ -62,10 +65,6 @@ export const AllUsersVideoGrid: React.FC<AllUsersVideoGridProps> = ({ refreshTri
     setSelectedVideos(new Set());
     setIsSelectionMode(false);
   }, [tabType]);
-
-  // Check if tab is disconnected
-  const disconnectedTabs = ['ideation', 'usa', 'spanish'];
-  const isDisconnected = disconnectedTabs.includes(tabType);
 
   // Fetch ALL users' videos from user_videos table (admin only) for specific tab
   const { data: videos = [], isLoading, refetch } = useQuery({
