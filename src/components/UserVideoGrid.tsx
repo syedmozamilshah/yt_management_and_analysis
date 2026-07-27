@@ -44,21 +44,6 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
   const updateDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const lastUpdateTimeRef = useRef<number>(0);
 
-  // Check if tab is disconnected (ideation, usa, spanish)
-  const disconnectedTabs = ['ideation', 'usa', 'spanish'];
-  const isDisconnected = disconnectedTabs.includes(tabType);
-
-  // Show error toast when accessing disconnected tabs
-  useEffect(() => {
-    if (isDisconnected) {
-      toast({
-        title: "Error",
-        description: "Something went wrong",
-        variant: "destructive"
-      });
-    }
-  }, [tabType, toast, isDisconnected]);
-
   // Debounced refetch to prevent update loops - only refetch max once per 5 seconds
   const debouncedRefetch = useCallback(() => {
     const now = Date.now();
@@ -647,21 +632,6 @@ export const UserVideoGrid: React.FC<UserVideoGridProps> = ({ refreshTrigger = 0
   // Only show loading skeleton on initial load (when we have no cached data)
   // This prevents skeleton flash on navigation back to the page
   const showLoadingSkeleton = isLoading && videos.length === 0;
-
-  // Show empty state for disconnected tabs
-  if (isDisconnected) {
-    return (
-      <div className="bg-[#181818] rounded-2xl border border-[#272727] p-12 text-center">
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[#272727] mb-6">
-          <Sparkles className="w-10 h-10 text-[#aaaaaa]" />
-        </div>
-        <h3 className="text-2xl font-bold text-[#f1f1f1] mb-3">No Videos Available</h3>
-        <p className="text-[#aaaaaa] text-lg mb-4 max-w-md mx-auto">
-          This tab is currently unavailable.
-        </p>
-      </div>
-    );
-  }
 
   if (showLoadingSkeleton) {
     return (
