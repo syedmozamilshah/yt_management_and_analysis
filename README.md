@@ -103,31 +103,31 @@ Explore the BlowMe AI platform through these screenshots:
 <summary><b>Click to view gallery</b></summary>
 
 ### Authentication
-<img src="./Output/Login Page.png" alt="Login Page" width="800" />
+<img src="./Output/Login%20Page.png" alt="Login Page" width="800" />
 <br />
-<img src="./Output/Admin Login page.png" alt="Admin Login" width="800" />
+<img src="./Output/Admin%20Login%20page.png" alt="Admin Login" width="800" />
 
 ### Dashboards
 <img src="./Output/2.png" alt="Main View" width="800" />
 <br />
-<img src="./Output/Admin Dashboard.png" alt="Admin Dashboard" width="800" />
+<img src="./Output/Admin%20Dashboard.png" alt="Admin Dashboard" width="800" />
 <br />
-<img src="./Output/Setting Sidebar.png" alt="Settings Sidebar" width="800" />
+<img src="./Output/Setting%20Sidebar.png" alt="Settings Sidebar" width="800" />
 <br />
-<img src="./Output/Admin User management admin can approve disapprove and block users.png" alt="Admin User Management" width="800" />
+<img src="./Output/Admin%20User%20management%20admin%20can%20approve%20disapprove%20and%20block%20users.png" alt="Admin User Management" width="800" />
 
 ### Features & Tools
-<img src="./Output/Adding New channel and selecting timeperiod to fetch videos.png" alt="Adding New Channel" width="800" />
+<img src="./Output/Adding%20New%20channel%20and%20selecting%20timeperiod%20to%20fetch%20videos.png" alt="Adding New Channel" width="800" />
 <br />
-<img src="./Output/Competitor Finder.png" alt="Competitor Finder" width="800" />
+<img src="./Output/Competitor%20Finder.png" alt="Competitor Finder" width="800" />
 <br />
-<img src="./Output/Script Generator.png" alt="Script Generator" width="800" />
+<img src="./Output/Script%20Generator.png" alt="Script Generator" width="800" />
 <br />
-<img src="./Output/Seo Generator.png" alt="SEO Generator" width="800" />
+<img src="./Output/Seo%20Generator.png" alt="SEO Generator" width="800" />
 <br />
-<img src="./Output/Title Generator.png" alt="Title Generator" width="800" />
+<img src="./Output/Title%20Generator.png" alt="Title Generator" width="800" />
 <br />
-<img src="./Output/Screenshot 2026-07-27 224842.png" alt="Ideation Analysis" width="800" />
+<img src="./Output/Screenshot%202026-07-27%20224842.png" alt="Ideation Analysis" width="800" />
 
 </details>
 
@@ -303,7 +303,7 @@ flowchart TD
     L --> E
     M --> D
 
-    H -->|Admin| N[/admin route\nEmail + Password]
+    H -->|Admin| N["/admin route<br/>Email + Password"]
     N --> O{Is admin email?}
     O -->|Yes| C
     O -->|No| P[Access Denied → Sign Out]
