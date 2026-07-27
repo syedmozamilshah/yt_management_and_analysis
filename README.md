@@ -99,8 +99,6 @@ mindmap
 
 Explore the BlowMe AI platform through these screenshots:
 
-<details>
-<summary><b>Click to view gallery</b></summary>
 
 ### Authentication
 <img src="./Output/Login%20Page.png" alt="Login Page" width="800" />
@@ -128,8 +126,6 @@ Explore the BlowMe AI platform through these screenshots:
 <img src="./Output/Title%20Generator.png" alt="Title Generator" width="800" />
 <br />
 <img src="./Output/Screenshot%202026-07-27%20224842.png" alt="Ideation Analysis" width="800" />
-
-</details>
 
 ---
 
@@ -573,18 +569,18 @@ erDiagram
 flowchart TD
     REQ["Incoming Request"]
 
-    REQ --> RLS["Row Level Security\nPostgreSQL RLS Policies"]
+    REQ --> RLS["Row Level Security<br/>PostgreSQL RLS Policies"]
 
     RLS --> CHECK{User Type}
 
-    CHECK -->|Regular User| OWN["Can only read/write\nown user_id rows"]
+    CHECK -->|Regular User| OWN["Can only read/write<br/>own user_id rows"]
     CHECK -->|Admin| ADMIN_CHECK{Admin Email Match}
 
-    ADMIN_CHECK -->|admin@blowmeai.com| ALL["Full access to\nall data"]
+    ADMIN_CHECK -->|"admin@blowmeai.com"| ALL["Full access to<br/>all data"]
     ADMIN_CHECK -->|Other| OWN
 
-    OWN --> TABS["Ideation: own channels only\nUSA/Spanish: read-only\n(admin writes for all)"]
-    ALL --> GLOBAL["Full CRUD on all tables\nUser management\nGlobal channel distribution"]
+    OWN --> TABS["Ideation: own channels only<br/>USA/Spanish: read-only<br/>(admin writes for all)"]
+    ALL --> GLOBAL["Full CRUD on all tables<br/>User management<br/>Global channel distribution"]
 ```
 
 ---
