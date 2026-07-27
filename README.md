@@ -95,6 +95,35 @@ mindmap
 
 ---
 
+## 📸 Platform Gallery
+
+Explore the BlowMe AI platform through these screenshots:
+
+<details>
+<summary><b>Click to view gallery</b></summary>
+
+### Authentication
+![Login Page](Output/Login%20Page.png)
+![Admin Login](Output/Admin%20Login%20page.png)
+
+### Dashboards
+![Main View](Output/2.png)
+![Admin Dashboard](Output/Admin%20Dashboard.png)
+![Settings Sidebar](Output/Setting%20Sidebar.png)
+![Admin User Management](Output/Admin%20User%20management%20admin%20can%20approve%20disapprove%20and%20block%20users.png)
+
+### Features & Tools
+![Adding New Channel](Output/Adding%20New%20channel%20and%20selecting%20timeperiod%20to%20fetch%20videos.png)
+![Competitor Finder](Output/Competitor%20Finder.png)
+![Script Generator](Output/Script%20Generator.png)
+![SEO Generator](Output/Seo%20Generator.png)
+![Title Generator](Output/Title%20Generator.png)
+![Ideation Analysis](Output/Screenshot%202026-07-27%20224842.png)
+
+</details>
+
+---
+
 ## 👥 User Roles & Access
 
 ```mermaid
