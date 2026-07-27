@@ -103,22 +103,31 @@ Explore the BlowMe AI platform through these screenshots:
 <summary><b>Click to view gallery</b></summary>
 
 ### Authentication
-![Login Page](Output/Login%20Page.png)
-![Admin Login](Output/Admin%20Login%20page.png)
+<img src="./Output/Login Page.png" alt="Login Page" width="800" />
+<br />
+<img src="./Output/Admin Login page.png" alt="Admin Login" width="800" />
 
 ### Dashboards
-![Main View](Output/2.png)
-![Admin Dashboard](Output/Admin%20Dashboard.png)
-![Settings Sidebar](Output/Setting%20Sidebar.png)
-![Admin User Management](Output/Admin%20User%20management%20admin%20can%20approve%20disapprove%20and%20block%20users.png)
+<img src="./Output/2.png" alt="Main View" width="800" />
+<br />
+<img src="./Output/Admin Dashboard.png" alt="Admin Dashboard" width="800" />
+<br />
+<img src="./Output/Setting Sidebar.png" alt="Settings Sidebar" width="800" />
+<br />
+<img src="./Output/Admin User management admin can approve disapprove and block users.png" alt="Admin User Management" width="800" />
 
 ### Features & Tools
-![Adding New Channel](Output/Adding%20New%20channel%20and%20selecting%20timeperiod%20to%20fetch%20videos.png)
-![Competitor Finder](Output/Competitor%20Finder.png)
-![Script Generator](Output/Script%20Generator.png)
-![SEO Generator](Output/Seo%20Generator.png)
-![Title Generator](Output/Title%20Generator.png)
-![Ideation Analysis](Output/Screenshot%202026-07-27%20224842.png)
+<img src="./Output/Adding New channel and selecting timeperiod to fetch videos.png" alt="Adding New Channel" width="800" />
+<br />
+<img src="./Output/Competitor Finder.png" alt="Competitor Finder" width="800" />
+<br />
+<img src="./Output/Script Generator.png" alt="Script Generator" width="800" />
+<br />
+<img src="./Output/Seo Generator.png" alt="SEO Generator" width="800" />
+<br />
+<img src="./Output/Title Generator.png" alt="Title Generator" width="800" />
+<br />
+<img src="./Output/Screenshot 2026-07-27 224842.png" alt="Ideation Analysis" width="800" />
 
 </details>
 
@@ -136,19 +145,19 @@ flowchart TD
     D -->|approved| F[✅ Full Access]
     D -->|blocked| G[🚫 Access Denied]
 
-    F --> H[Ideation Tab\nPersonal channel tracking]
-    F --> I[USA Tab\nAdmin curated content]
-    F --> J[Spanish Tab\nAdmin curated content]
-    F --> K[AI Tools\nScript / SEO / Title / Competitor]
-    F --> L[Favorites\nBookmarked videos]
+    F --> H[Ideation Tab<br/>Personal channel tracking]
+    F --> I[USA Tab<br/>Admin curated content]
+    F --> J[Spanish Tab<br/>Admin curated content]
+    F --> K[AI Tools<br/>Script / SEO / Title / Competitor]
+    F --> L[Favorites<br/>Bookmarked videos]
 
     C --> M[All User Features]
     C --> N[Admin Dashboard]
-    N --> O[User Management\nApprove / Block / View]
-    N --> P[Video Management\nAll users videos]
-    N --> Q[Channel Management\nGlobal channel sync]
-    N --> R[Admin Stats\nPlatform analytics]
-    N --> S[Data View Toggle\nAll Data ↔ My Data]
+    N --> O[User Management<br/>Approve / Block / View]
+    N --> P[Video Management<br/>All users videos]
+    N --> Q[Channel Management<br/>Global channel sync]
+    N --> R[Admin Stats<br/>Platform analytics]
+    N --> S[Data View Toggle<br/>All Data ↔ My Data]
 ```
 
 ---
